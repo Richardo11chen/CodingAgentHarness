@@ -302,6 +302,22 @@
 | **review 结果** | Spec ✅, Quality Approved, Verdict: PASS。确认 deviation 合理——brief 的 test 与 implementation 内部矛盾，implementer 的最小修改（100→10）使 brief 期望的 PASS 成立 |
 | **教训** | brief 中的 test fixture 需要与 implementation 的参数一致——estimateTokens 用 length/4，22 tokens 的 fixture 配 tokenLimit: 100 永远不触发压缩。writing-plans 阶段应验证 test fixture 的数值是否与实现逻辑一致 |
 
+### 17:30 — Task 13: RealLLMProvider
+
+| 项 | 内容 |
+|---|---|
+| **时间戳** | 2026-07-13 17:30 |
+| **Task** | 13 — RealLLMProvider (OpenAI-compatible API client) |
+| **Superpowers 技能** | `subagent-driven-development` + `test-driven-development` |
+| **Implementer subagent** | 派发 general subagent，提供 task-13-brief.md |
+| **subagent 输出** | Status: DONE。修改 src/core/llm.ts 添加 RealLLMProvider，创建 tests/core/llm-real.test.ts |
+| **commit** | `0a299f7` — `feat: RealLLMProvider — OpenAI-compatible API client with tool calling` |
+| **subagent 关注点** | 仅处理第一个 tool_call、JSON.parse 无 guard、无 retry/streaming/timeout、fetch mock 非 per-test scoped、tool 定义硬编码——均继承自 brief |
+| **人工干预** | 无 |
+| **Task reviewer** | 派发 general subagent |
+| **review 结果** | Spec ✅, Quality Approved, Verdict: PASS。所有 issue 均继承自 brief，不影响通过的测试和类型检查 |
+| **教训** | RealLLMProvider 的 fetch mock 用 global.fetch = vi.fn() 是进程级 mutation——如果测试套件增长可能脆弱。生产环境应考虑 per-test scoped mock |
+
 ---
 
 ## 待续
