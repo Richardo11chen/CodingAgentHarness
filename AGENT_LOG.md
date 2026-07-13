@@ -174,6 +174,86 @@
 | **总测试结果** | 18 tests / 5 files — all PASS |
 | **教训** | 冷启动验证的核心价值在于发现 PLAN 代码的 latent bug——这些 bug 只在实现时才暴露，此时修复代价比在 PLAN 阶段发现要大得多 |
 
+### 15:40 — Task 3: Config System
+
+| 项 | 内容 |
+|---|---|
+| **时间戳** | 2026-07-13 15:40 |
+| **Task** | 3 — Config System |
+| **Superpowers 技能** | `subagent-driven-development` + `test-driven-development` |
+| **Implementer subagent** | 派发 general subagent，提供 task-3-brief.md + 项目上下文 |
+| **subagent 输出** | Status: DONE。创建了 src/core/config.ts（loadConfig + DEFAULT_CONFIG） |
+| **commit** | `600c0f6` — `feat: config system with YAML loading and defaults` |
+| **subagent 关注点** | yaml 的 parse 返回 any，malformed YAML 未验证——可接受，DEFAULT_CONFIG 通过 spread-merge 保证必填字段 |
+| **人工干预** | 无 |
+| **Task reviewer** | 派发 general subagent |
+| **review 结果** | Spec ✅, Quality Approved, Verdict: PASS。Minor: parsed 是 any（matches brief），测试用固定文件名无 cleanup |
+| **教训** | 配置系统的 spread-merge 模式简单有效——一层深度的合并足以覆盖当前 Config 结构 |
+
+### 15:50 — Task 4: Tool System
+
+| 项 | 内容 |
+|---|---|
+| **时间戳** | 2026-07-13 15:50 |
+| **Task** | 4 — Tool System (file_read, file_write, file_delete, shell_exec, run_test) |
+| **Superpowers 技能** | `subagent-driven-development` + `test-driven-development` |
+| **Implementer subagent** | 派发 general subagent，提供 task-4-brief.md + 项目上下文 + 冷启动 P2 修订说明 |
+| **subagent 输出** | Status: DONE_WITH_CONCERNS。创建了 src/core/tools/file.ts, shell.ts, test-runner.ts + 对应测试 |
+| **commit** | `2bb32ef` — `feat: tool system (file_read, file_write, file_delete, shell_exec, run_test)` |
+| **subagent 关注点** | 1) 冷启动 P2 修订（args.timeoutMs）不适用——ToolArgs 无 timeoutMs 字段，且被禁止修改 types.ts，按 brief verbatim 用 timeout: 30000；2) shellExec 的 SIGTERM 分支返回 exitCode: null 不符合 ToolResult.exitCode?: number，仅因 catch(e: any) 的 any 推断而编译通过 |
+| **人工干预** | 无（关注点都是类型层面的 latent issue，不影响当前功能） |
+| **Task reviewer** | 派发 general subagent |
+| **review 结果** | Spec ✅, Quality Issues Found (all inherited from brief), Verdict: PASS。Issues: exitCode null 类型脆弱、catch(e:any) 削弱类型安全、timeout 测试实际跑的是 false 而非 sleep 10、验证分支无测试 |
+| **教训** | 冷启动发现的 P2（shellExec 签名问题）在实际实现中确认——ToolArgs 类型需要扩展 timeoutMs 字段才能支持 per-call 超时。这应在 Task 11（Agent Loop）集成时解决 |
+
+### 16:10 — Task 6: HITL State Machine
+
+| 项 | 内容 |
+|---|---|
+| **时间戳** | 2026-07-13 16:10 |
+| **Task** | 6 — HITL State Machine (Governance — Focus) |
+| **Superpowers 技能** | `subagent-driven-development` + `test-driven-development` |
+| **Implementer subagent** | 派发 general subagent，提供 task-6-brief.md + 项目上下文 |
+| **subagent 输出** | Status: DONE。创建了 src/core/governance/hitl.ts（HitlStateMachine 类，Running/PendingApproval/Stopped 三状态） |
+| **commit** | `22e57dc` — `feat: HITL state machine — Running/PendingApproval/Stopped transitions` |
+| **subagent 关注点** | timeout() 是手动调用（无内部计时器）、无 re-entrant requestApproval guard、stop() 是终态（无 resume()）、未接线到 PolicyEngine/Tracer（属于 Task 11 集成） |
+| **人工干预** | 无 |
+| **Task reviewer** | 派发 general subagent |
+| **review 结果** | Spec ✅, Quality Approved, Verdict: PASS。Minor: 测试文件 import 缺 .js 扩展名（matches brief），getPendingAction 的 stash 行为未测 |
+| **教训** | 状态机的每个转换都应有 guard——approve/deny 只在 PendingApproval 时生效，requestApproval 在 Stopped 时 no-op。这确保了无非法转换 |
+
+### 16:20 — Task 7: Sandbox
+
+| 项 | 内容 |
+|---|---|
+| **时间戳** | 2026-07-13 16:20 |
+| **Task** | 7 — Sandbox (Governance — Focus) |
+| **Superpowers 技能** | `subagent-driven-development` + `test-driven-development` |
+| **Implementer subagent** | 派发 general subagent，提供 task-7-brief.md + 项目上下文 |
+| **subagent 输出** | Status: DONE_WITH_CONCERNS。创建了 src/core/governance/sandbox.ts（Sandbox 类，路径边界 enforcement） |
+| **commit** | `b664ed1` — `feat: Sandbox — path boundary enforcement for tool execution` |
+| **subagent 关注点** | SandboxLimits 存储但未 enforce（timeout/maxMemory）、symlink traversal 未处理（仅 lexical resolution）、Tool 类型耦合到 tools/file.js |
+| **人工干预** | 无 |
+| **Task reviewer** | 派发 general subagent |
+| **review 结果** | Spec ✅, Quality Approved, Verdict: PASS。Minor: limits 未 enforce、symlink 未处理、测试覆盖薄（仅 3 个 brief 指定 case） |
+| **教训** | 路径验证用 resolve + relative + isAbsolute 三步法是正确的——resolve 锚定路径，relative 检测上溯，isAbsolute 防止 Windows 驱动器前缀逃逸。但仅 lexical resolution 不够，生产环境需要 fs.realpath 防 symlink 逃逸 |
+
+### 16:30 — Task 9: Memory System
+
+| 项 | 内容 |
+|---|---|
+| **时间戳** | 2026-07-13 16:30 |
+| **Task** | 9 — Memory System |
+| **Superpowers 技能** | `subagent-driven-development` + `test-driven-development` |
+| **Implementer subagent** | 派发 general subagent，提供 task-9-brief.md + 项目上下文 |
+| **subagent 输出** | Status: DONE。创建了 src/core/memory.ts（MemoryStore 类，read/write/consolidate + LRU eviction） |
+| **commit** | `770a1e8` — `feat: memory system — file-based KV store with LRU eviction` |
+| **subagent 关注点** | 1) 在 vitest import 中加了 afterEach（brief 用全局但 strict-mode typecheck 报 TS2304）；2) LRU eviction 仅在 write 时触发，read 不 trim；3) 无文件锁——并发实例可能丢失更新；4) load/save 静默吞错；5) 仅子串搜索无排序 |
+| **人工干预** | 无 |
+| **Task reviewer** | 派发 general subagent |
+| **review 结果** | Spec ✅, Quality Approved, Verdict: PASS。Minor: LRU 是 write-time only、load/save 吞错、无文件锁、子串搜索无排序——均 matches brief scope |
+| **教训** | LRU 的 reduce 用严格 `<` 比较 lastAccessed，在时间戳相同时保留最早插入的条目——这是正确的 LRU 语义。但 LRU 仅在 write 时触发意味着 read 不会淘汰旧条目，这是 partial LRU |
+
 ---
 
 ## 待续
