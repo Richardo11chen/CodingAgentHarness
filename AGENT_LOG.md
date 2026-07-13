@@ -350,6 +350,23 @@
 | **review 结果** | Spec ✅, Quality Approved, Verdict: PASS。确认 keytar mock 合理且必要（与 Task 14 pattern 一致）。WebSocket 集成正确——Tracer callback 广播到 wss.clients，有 readyState === 1 guard |
 | **教训** | keytar 的 native binding 在 headless Linux 环境会失败——任何 import keytar 的模块在测试时都需要 mock。这是跨 task 的环境约束，应在 PLAN 中提前说明 |
 
+### 18:15 — Task 16: WebUI Frontend
+
+| 项 | 内容 |
+|---|---|
+| **时间戳** | 2026-07-13 18:15 |
+| **Task** | 16 — WebUI Frontend (React + Vite) |
+| **Superpowers 技能** | `subagent-driven-development` |
+| **Implementer subagent** | 派发 general subagent，提供 task-16-brief.md |
+| **subagent 输出** | Status: DONE_WITH_CONCERNS。创建了 8 个文件：App.tsx, ChatPanel.tsx, MonitorPanel.tsx, ApprovalModal.tsx, useWebSocket.ts, index.html, main.tsx, vite.config.ts |
+| **commit** | `f9c442f` — `feat: WebUI frontend — chat panel, collapsible monitor, HITL approval modal` |
+| **build 结果** | `npx vite build` 成功——34 modules, 707ms, output at dist/frontend/。Full suite 69/69 pass |
+| **subagent 关注点** | 1) vite.config.ts 偏离 brief——加了 root: "src/web/frontend" 和调整 outDir，否则 Vite 找不到 index.html；2) tsc --noEmit 在 .tsx 文件上失败——root tsconfig.json 无 "jsx" 设置，不能修改；3) App.tsx 在 render 中调 setPendingApproval（React anti-pattern）；4) handleSend 的 session-creation race——用 stale null sessionId |
+| **人工干预** | 无（所有 issue 均继承自 brief，implementer 被指示不偏离 spec） |
+| **Task reviewer** | 派发 general subagent |
+| **review 结果** | Spec ✅, Quality Issues Found (all inherited from brief), Verdict: PASS。Issues: React anti-pattern (setPendingApproval in render)、race condition (stale sessionId)、dead state (ws/setWs unused)、tsc strict mode violation (no jsx in tsconfig)。vite.config.ts deviation 合理且必要 |
+| **教训** | 前端 task 的 TDD 不如后端严格——React 组件没有单元测试框架。Vite build 成功是主要验证手段。brief 中的 React 代码有 anti-pattern（render 中 setState），应在后续重构中修复为 useEffect |
+
 ---
 
 ## 待续
