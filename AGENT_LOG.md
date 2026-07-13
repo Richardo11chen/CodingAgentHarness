@@ -399,6 +399,26 @@
 | **review 结果** | Spec ✅, Quality Approved, Verdict: PASS。YAML 语法正确，stage 结构（test→build→deploy）正确 |
 | **教训** | CI 配置的"最后一次必须 pass"要求需要在 GitLab 上实际运行 pipeline 才能验证——这是部署阶段的工作 |
 
+### 19:00 — Task 19: Mechanism Demos (A.6) + Critical Fix
+
+| 项 | 内容 |
+|---|---|
+| **时间戳** | 2026-07-13 19:00 |
+| **Task** | 19 — Mechanism Demos (A.6 requirement) |
+| **Superpowers 技能** | `subagent-driven-development` + `test-driven-development` + `systematic-debugging`（fix 阶段） |
+| **Implementer subagent** | 派发 general subagent，提供 task-19-brief.md |
+| **subagent 输出** | Status: DONE_WITH_CONCERNS。创建了 3 个 demo 测试。Demo ① guardrail ✓、Demo ② feedback ✓、Demo ③ HITL ✗ 失败 |
+| **commit (initial)** | `a6aed30` — `test: mechanism demos — guardrail, feedback loop, HITL approval (A.6)` |
+| **Critical 问题** | Demo ③ 失败——loop.ts 在 `ask` 分支中立即 `hitl.deny()` 而非暂停等待外部审批。HITL 状态机在隔离测试中正确，但主循环没有 await 外部审批，导致 HITL 机制实际不工作 |
+| **Fix subagent** | 派发 fix subagent 修复 hitl.ts + loop.ts |
+| **fix 内容** | 1) hitl.ts 添加 `waitForApproval(): Promise<Action \| null>`——用 resolver pattern，approve/deny/stop 调用 resolver 解除阻塞；2) loop.ts 的 `ask` 分支改为 `await hitl.waitForApproval()`，用户批准则执行动作，拒绝则回灌拒绝消息 |
+| **commit (fix)** | `6e20722` — `fix: HITL approval flow pauses for external approval instead of auto-deny` |
+| **fix 结果** | 全部 72 个测试通过（含之前失败的 Demo ③）。tsc 无新错误。无回归 |
+| **人工干预** | 无（fix subagent 自主完成） |
+| **Task reviewer** | 派发 general subagent |
+| **review 结果** | Spec ✅, Quality Approved, Verdict: PASS。确认 fix 正确——waitForApproval promise pattern 干净，approve/deny/stop 都调用 resolver 并 null out，无 leak/double-resolve。Minor: approved path 缺 tool-existence guard、demo 用 setTimeout(100) 可能 flaky、feedback demo 的 validator 不检查 sensors |
+| **教训** | HITL 的实现需要 promise-based 等待机制——loop 必须 await 外部审批，不能同步 auto-deny。这是 PLAN 中的一个设计缺陷：原 PLAN 的 loop 代码在 `ask` 分支直接 `hitl.deny()`，注释说"In test mode, auto-deny"，但这违背了 HITL 的核心目的。冷启动验证未发现此问题（因为冷启动只做了 Task 5 和 8，没有做 Task 11/19）。如果冷启动也做了 Task 11，可能提前发现这个问题 |
+
 ---
 
 ## 待续
