@@ -270,6 +270,22 @@
 | **review 结果** | Spec ✅, Quality Issues Found (minor, inherited from brief), Verdict: PASS。Issues: 未使用的 TraceEventType import、onEvent callback 未测、getDenials 类型逃逸、flush no-op |
 | **教训** | Tracer 的 onEvent callback 是 WebUI 实时推送的关键——但当前未测试。Task 15（WebUI Backend）集成时需要验证 onEvent 确实触发 WebSocket 推送 |
 
+### 17:00 — Task 11: Agent Main Loop
+
+| 项 | 内容 |
+|---|---|
+| **时间戳** | 2026-07-13 17:00 |
+| **Task** | 11 — Agent Main Loop (Integration) |
+| **Superpowers 技能** | `subagent-driven-development` + `test-driven-development` |
+| **Implementer subagent** | 派发 general subagent，提供 task-11-brief.md + 全部已完成模块的上下文 |
+| **subagent 输出** | Status: DONE_WITH_CONCERNS。创建了 src/core/loop.ts（Harness 类，集成 LLM/工具/治理/反馈/记忆/Tracer） |
+| **commit** | `b0dcef9` — `feat: agent main loop — integrates all modules with governance and feedback` |
+| **subagent 关注点** | 1) brief 的实现为每个 LLM 响应记录 action trace event（含 done），但 test 2 断言 getActions() 长度为 1——矛盾。Implementer 将 action event 移到仅 call_tool 时触发（TDD: test is spec）；2) brief 的 test 缺少 beforeEach/afterEach import，修复为 codebase 约定；3) tests/integration/agent-loop.test.ts 在 brief header 中列出但无代码，未创建 |
+| **人工干预** | 无（关注点 1 是 TDD 正确决策——test is spec，brief 代码与 test 矛盾时以 test 为准） |
+| **Task reviewer** | 派发 general subagent |
+| **review 结果** | Spec ✅, Quality Approved, Verdict: PASS。确认 action event 移动是 reasonable and correct deviation——brief 自己的代码与 test 矛盾，implementer 正确遵循 TDD 原则。thinking event 仍为每个响应触发，无可观测性损失 |
+| **教训** | 集成 task 是最复杂的——brief 代码与 test 矛盾时，TDD 原则（test is spec）是正确的决策依据。implementer 的自主判断（将 action event 移到 call_tool only）比盲目照搬 brief 代码更好 |
+
 ---
 
 ## 待续
