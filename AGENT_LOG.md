@@ -419,8 +419,56 @@
 | **review 结果** | Spec ✅, Quality Approved, Verdict: PASS。确认 fix 正确——waitForApproval promise pattern 干净，approve/deny/stop 都调用 resolver 并 null out，无 leak/double-resolve。Minor: approved path 缺 tool-existence guard、demo 用 setTimeout(100) 可能 flaky、feedback demo 的 validator 不检查 sensors |
 | **教训** | HITL 的实现需要 promise-based 等待机制——loop 必须 await 外部审批，不能同步 auto-deny。这是 PLAN 中的一个设计缺陷：原 PLAN 的 loop 代码在 `ask` 分支直接 `hitl.deny()`，注释说"In test mode, auto-deny"，但这违背了 HITL 的核心目的。冷启动验证未发现此问题（因为冷启动只做了 Task 5 和 8，没有做 Task 11/19）。如果冷启动也做了 Task 11，可能提前发现这个问题 |
 
+### 19:15 — Task 20: Cloud Deployment
+
+| 项 | 内容 |
+|---|---|
+| **时间戳** | 2026-07-13 19:15 |
+| **Task** | 20 — Cloud Deployment (render.yaml + README) |
+| **Superpowers 技能** | `subagent-driven-development` |
+| **Implementer subagent** | 派发 general subagent，提供 task-20-brief.md |
+| **subagent 输出** | Status: DONE。创建了 render.yaml + 更新了 README.md |
+| **commit** | `7c76e4e` — `feat: cloud deployment config for Render` |
+| **subagent 关注点** | plan: free 有资源限制（demo-only）；无 test/lint 适用于静态配置文件 |
+| **人工干预** | 无 |
+| **Task reviewer** | 派发 general subagent |
+| **review 结果** | Spec ✅, Quality Approved, Verdict: PASS。render.yaml 匹配 brief，README 有三个必需章节，healthCheckPath /api/health 验证正确 |
+| **教训** | 云部署配置相对简单——render.yaml 是声明式配置，关键是 healthCheckPath 要与后端实际路由匹配 |
+
+### 19:20 — 全部 20 个 Task 完成
+
+| 项 | 内容 |
+|---|---|
+| **时间戳** | 2026-07-13 19:20 |
+| **里程碑** | 全部 20 个 task 实现完成 |
+| **总测试数** | 72 个测试全部通过 |
+| **分支** | feat/initial-implementation |
+| **commit 数** | 约 25 个 commit（含 SPEC/PLAN/AGENT_LOG 文档 + 20 个 task 实现 + 1 个 fix） |
+| **下一步** | 最终全分支评审（requesting-code-review）→ finishing-a-development-branch |
+
 ---
 
-## 待续
+## 实现阶段总结
 
-（后续 task 的记录将在执行时追加）
+### 关键数据
+- **20/20 task 完成**，全部通过 task review
+- **72 个测试全部通过**（含 3 个 A.6 机制演示）
+- **1 个 Critical fix**：HITL 异步审批（Task 19 fix）
+- **冷启动验证**：发现 6 个 SPEC 缺陷 + 5 个 PLAN 缺陷，全部修订
+
+### Superpowers 技能使用统计
+| 技能 | 使用次数 | 场景 |
+|------|---------|------|
+| `brainstorming` | 1 | SPEC 生成 |
+| `writing-plans` | 1 | PLAN 生成 |
+| `using-git-worktrees` | 1 | 工作区准备（选择 feature 分支） |
+| `subagent-driven-development` | 20+ | 每个 task 的 implementer + reviewer |
+| `test-driven-development` | 18 | 每个 task 的 TDD 循环（Task 16 前端除外） |
+| `systematic-debugging` | 1 | Task 19 HITL fix |
+
+### 教训总结
+1. **PLAN 代码需要验证**：冷启动发现的 globMatch bug 和 shellExec 签名问题说明 PLAN 中的代码不能仅凭经验手写
+2. **TDD 的 test is spec 原则**：当 brief 代码与 test 矛盾时，以 test 为准（Task 11 action event、Task 12 tokenLimit、Task 14 keytar mock）
+3. **HITL 需要 promise-based 等待**：loop 必须 await 外部审批，不能同步 auto-deny（Task 19 Critical fix）
+4. **keytar 在 headless Linux 需要 mock**：native binding 缺 libsecret-1.so.0（Task 14, 15）
+5. **进度 ledger 是防 compaction 的关键**：对话记忆不持久，但文件和 git 历史在
