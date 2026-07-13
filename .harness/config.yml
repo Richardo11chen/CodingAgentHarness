@@ -1,0 +1,20 @@
+llm:
+  provider: "openai-compatible"
+  model: "glm-5.2"
+  baseURL: "https://njusehub.info/v1"
+tools:
+  - file_read
+  - file_write
+  - file_delete
+  - shell_exec
+  - run_test
+policies: ".harness/policies.yml"
+sensors:
+  test: "npm test"
+  lint: "npx eslint src/"
+  typecheck: "npx tsc --noEmit"
+sandbox:
+  timeout: 30
+  maxMemory: 512
+maxSteps: 50
+timeout: 300

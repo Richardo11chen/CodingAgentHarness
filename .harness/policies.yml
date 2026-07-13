@@ -1,0 +1,30 @@
+rules:
+  - name: "no-rm-rf-root"
+    type: command_pattern
+    pattern: 'rm\s+(-[a-zA-Z]*f[a-zA-Z]*\s+)*-?r?f?\s+/'
+    decision: deny
+    message: "禁止递归删除根目录"
+
+  - name: "force-push-approval"
+    type: command_pattern
+    pattern: 'git\s+push.*--force'
+    decision: ask
+    message: "强制推送需要人工确认"
+
+  - name: "no-write-outside-project"
+    type: path_boundary
+    pattern: "."
+    decision: deny
+    message: "禁止写入项目目录外"
+
+  - name: "env-file-protection"
+    type: path_pattern
+    pattern: "**/.env"
+    decision: ask
+    message: "修改 .env 文件需要确认"
+
+  - name: "db-drop-protection"
+    type: command_pattern
+    pattern: '(DROP|DELETE)\s+(TABLE|DATABASE)'
+    decision: ask
+    message: "删除数据库操作需要确认"

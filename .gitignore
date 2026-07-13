@@ -1,0 +1,9 @@
+docs/AI4SE_Final_Project_A_Coding_Agent_Harness.md
+docs/通用要求.md
+
+node_modules/
+dist/
+.env
+.harness/memory.json
+*.log
+.DS_Store
