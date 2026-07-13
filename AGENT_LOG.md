@@ -254,6 +254,22 @@
 | **review 结果** | Spec ✅, Quality Approved, Verdict: PASS。Minor: LRU 是 write-time only、load/save 吞错、无文件锁、子串搜索无排序——均 matches brief scope |
 | **教训** | LRU 的 reduce 用严格 `<` 比较 lastAccessed，在时间戳相同时保留最早插入的条目——这是正确的 LRU 语义。但 LRU 仅在 write 时触发意味着 read 不会淘汰旧条目，这是 partial LRU |
 
+### 16:40 — Task 10: Tracer
+
+| 项 | 内容 |
+|---|---|
+| **时间戳** | 2026-07-13 16:40 |
+| **Task** | 10 — Tracer (observability) |
+| **Superpowers 技能** | `subagent-driven-development` + `test-driven-development` |
+| **Implementer subagent** | 派发 general subagent，提供 task-10-brief.md + 项目上下文 |
+| **subagent 输出** | Status: DONE。创建了 src/core/tracer.ts（Tracer 类，record/export/getActions/getDenials/getFeedbackReports + maxEvents FIFO + onEvent callback） |
+| **commit** | `f0dbae8` — `feat: tracer — observability with event recording and filtering` |
+| **subagent 关注点** | getDenials() 用 (e.data as any).decision 绕过类型（TraceEvent.data 是 unknown）、flush() 是 no-op stub、shift() eviction 是 O(n) |
+| **人工干预** | 无 |
+| **Task reviewer** | 派发 general subagent |
+| **review 结果** | Spec ✅, Quality Issues Found (minor, inherited from brief), Verdict: PASS。Issues: 未使用的 TraceEventType import、onEvent callback 未测、getDenials 类型逃逸、flush no-op |
+| **教训** | Tracer 的 onEvent callback 是 WebUI 实时推送的关键——但当前未测试。Task 15（WebUI Backend）集成时需要验证 onEvent 确实触发 WebSocket 推送 |
+
 ---
 
 ## 待续
