@@ -111,6 +111,8 @@
 |---|---|
 | **输入** | Action（工具名 + 参数） |
 | **行为** | 逐条匹配策略规则（命令模式、路径边界、路径模式），返回首个匹配的决策 |
+| **glob 方言** | path_pattern 使用扩展 glob 语义：`**/` 匹配零个或多个目录层级（含根目录），`**` 独立使用时匹配任意路径，`*` 匹配单层路径段（不含 `/`），`?` 匹配单个字符。pattern 中的 `.` 等正则特殊字符应作为字面量处理（在转换为正则前需 escape） |
+| **path_boundary 基准** | pattern 为相对于 PROJECT_DIR 的路径（而非 CWD）。Agent Loop 在初始化 PolicyEngine 时注入 PROJECT_DIR 作为解析基准 |
 | **输出** | `{ decision: "allow" \| "deny" \| "ask", policy?: Policy }` |
 | **边界** | 无匹配规则时默认 allow；规则从 `.harness/policies.yml` 加载 |
 | **错误** | 规则文件格式错误 → 使用默认规则并警告 |
@@ -159,9 +161,9 @@ Running ──(guardrail: ask)──→ PendingApproval
 | 项 | 描述 |
 |---|---|
 | **输入** | Action（changedCode=true）+ 工具执行结果 |
-| **行为** | 运行配置的传感器命令（test/lint/typecheck）→ 解析输出 → 客观判定 → 分类失败 |
+| **行为** | 接收单个传感器的 ToolResult → 客观判定 → 解析失败 → 分类为以下之一：`syntax_error`、`type_error`、`lint_violation`、`test_failure`、`unknown`（按优先级顺序判定，首个命中即返回）。多传感器（test/lint/typecheck）由 Agent Loop 负责调度，分别调用 validate()，各自产生独立的 FeedbackReport |
 | **输出** | FeedbackReport（passed, failures[], category） |
-| **边界** | 传感器命令在配置中声明；输出解析支持常见格式（JUnit、tap、文本） |
+| **边界** | 单个 validate() 调用处理单个传感器结果；输出解析支持纯文本格式（JUnit XML 和 TAP 协议为未来扩展，不在初版范围） |
 | **错误** | 传感器命令执行失败 → 返回 unknown 状态；解析失败 → 返回原始输出 |
 
 **失败分类**：`syntax_error` / `test_failure` / `type_error` / `lint_violation` / `unknown`
@@ -371,6 +373,7 @@ interface Policy {
   decision: GuardrailDecision
   message: string
   except?: string         // path_boundary 的例外
+  appliesTo?: string[]    // 可选：限定策略只作用于指定工具（如 ["shell_exec"]）。未定义时作用于所有工具
 }
 
 // 反馈报告

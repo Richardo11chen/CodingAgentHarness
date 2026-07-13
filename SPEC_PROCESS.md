@@ -154,6 +154,167 @@
 
 ## 六、冷启动验证（§4.5）
 
-> **待执行**：在 SPEC 和 PLAN 完成后，用一个与主开发智能体不同的 agent，在不提供对话历史的前提下，仅凭 SPEC.md + PLAN.md 尝试实现 1-2 个 task。记录第二个 agent 在哪里暂停并提问、暴露了哪些 spec 缺陷。
+> **验证目的**：用一个**与主开发 agent 不同**的 agent，在**不提供对话历史**的前提下，仅凭 `SPEC.md` + `PLAN.md` 尝试实现 1-2 个 task。观察它在哪些地方暂停提问，暴露哪些 spec 缺陷。
 
-（此节将在实现阶段完成后补充）
+### 6.1 验证环境
+
+| 项 | 值 |
+|---|---|
+| **验证日期** | 2026-07-13 |
+| **Agent 身份** | 主会话中的新对话 agent（非 subagent），加载 superpowers brainstorming + TDD skills |
+| **Agent 可访问的上下文** | `SPEC.md`（完整 11 节）+ `PLAN.md`（完整 20 个 task）+ `package.json`（依赖已安装） |
+| **Agent 不可访问的上下文** | Agent Log、Superpowers 对话历史、Brainstorming 过程文档 |
+| **选择 task** | Task 5（Policy Engine）、Task 8（Feedback System）——用户建议这两个任务匹配逻辑和输出解析可能存在歧义 |
+| **Agent 前置条件** | Task 1（Scaffolding）和 Task 2（LLM Abstraction）已完成，`src/core/types.ts` 和 `src/core/llm.ts` 已存在 |
+
+### 6.2 观察结果
+
+#### 6.2.1 Agent 在哪里暂停并做出决策
+
+| # | 节点 | Agent 行为 | 性质 |
+|---|------|-----------|------|
+| O1 | Task 5 — `globMatch` 首跑 GREEN 失败 | PLAN 给的代码 `** → .*` 无法匹配根目录 `.env`（`.replace(/\*\*/g, ".*")` 先跑，后续 `*` 替换破坏了已生成的 `.*`，且未 escape `.`）。Agent **自行 debug**，用占位符方案（先替换为 NUL placeholder、再 escape regex chars、再替换为正则等价物）修复，共试错 2 轮 | **Spec/Plan Defect**：PLAN 代码有 2 个 bug，测试本身暴露了它 |
+| O2 | Task 8 — `SensorConfig` 字段范围 | PLAN 只定义了 `SensorConfig = { test: string }`。Agent **自行添加** `lint?: string; typecheck?: string`（可选字段）以对齐 `Config.sensors` 的完整类型定义 | **Agent 改进**（SPEC 要求三传感器，PLAN 简化为一传感器，agent 按 SPEC 做了对齐） |
+| O3 | Task 5 — `path_boundary` pattern `"."` 语义 | Agent 直接用 `resolve(policy.pattern)` 解析 `.`，依赖 CWD。未质疑 | **潜在缺陷**：Agent 遵循了 PLAN 的写法，但 `.` 是 CWD-relative，跨目录运行测试时行为不可靠 |
+| O4 | Task 8 — `classifyFailure` 运算符优先级 | `lower.includes("fail") \|\| lower.includes("assertion") \|\| lower.includes("expected") && lower.includes("to be")` — 实际解析为 `fail \|\| assertion \|\| (expected && to_be)`，因为 `&&` 优先级高于 `\|\|`。逻辑**碰巧正确**但可读性差。Agent 原样照搬 PLAN | **Spec 未明确**：优先级是否有意为之？PLAN 未加括号说明意图 |
+
+#### 6.2.2 Agent 做出了哪些与 SPEC/PLAN **原意不一致**的解读
+
+| # | PLAN/SPEC 原意 | Agent 实际解读 | 判定 |
+|---|---------------|---------------|------|
+| D1 | `globMatch` 用简单 `.replace` 链 | Agent 重写为占位符方案（6 行变 12 行） | **PLAN 写错**：简单 replace 链无法正确处理嵌套通配 + 正则特殊字符 |
+| D2 | `SensorConfig` 只要 `{ test: string }` | Agent 加了 `lint/typecheck` 可选字段 | **PLAN 过于最小**：不符合 SPEC §3.5 的完整配置 |
+| D3 | `shellExec` 在 PLAN Task 4 Step 7 中有 `(args, opts?: { timeout?: number })` 签名 | 未触达（本 session 未实现 Task 4），但若实现会撞类型不兼容 | **PLAN Defect**：`Tool` 类型只接受 `(args: ToolArgs) => Promise<ToolResult>`，`shellExec` 签名多出 `opts` 参数 |
+| D4 | `path_boundary` pattern `"."` 直接 `resolve` | Agent 照做 | **PLAN 不精确**：没有说明 `"."` 应相对于项目根目录，而非 CWD |
+
+#### 6.2.3 产出质量评估
+
+| 维度 | 评价 | 详情 |
+|------|------|------|
+| **测试是否通过** | ✅ PASS | 18/18 tests pass across 5 files, 包含 Task 1-2 的存量测试 |
+| **TDD 严格执行度** | ✅ 严格遵守 | 每个测试都经历了 RED→GREEN 循环，无跳过 RED 步骤 |
+| **`globMatch` 实现** | 优于 PLAN | 占位符方案正确性更高，能正确匹配 `**/.env` 对根目录 `.env` |
+| **`SensorConfig` 实现** | 优于 PLAN | 字段与 SPEC §3.5 的 `Config.sensors` 对齐 |
+| **代码直接可用性** | 可用，但需小幅修改 | `path_boundary` 的 CWD 依赖是 latent bug；`shellExec` 类型不兼容需改 PLAN |
+| **未实现** | 未实现：`fromYaml` 的加载测试、`classifyFailure` 跨多传感器合并、`extractFailures` JUnit/TAP 解析 | 这些功能 SPEC 声明但 PLAN 未覆盖 |
+
+### 6.3 暴露的 SPEC 缺陷
+
+| # | SPEC 章节 | 缺陷 | 严重度 | 修复方案 |
+|---|----------|------|--------|---------|
+| S1 | §3.4.1 path_pattern | "glob 匹配文件路径"未指定 glob 方言：POSIX？micromatch？minimatch？`**/` 是否匹配零目录？ | Medium | 明确为 POSIX glob，`**/` 匹配零个或多个目录层级 |
+| S2 | §3.4.1 path_boundary | pattern 的解析基准不明确（CWD？项目根？绝对路径？） | Medium | 明确 pattern 是相对于 `PROJECT_DIR` 的路径 |
+| S3 | §3.4.1 策略作用域 | 三种 policy type（`command_pattern`/`path_pattern`/`path_boundary`）对所有 tool 类型一视同仁，导致 `file_read` 动作被 `command_pattern` 规则误匹配（虽然因无 `command` 字段不会命中） | Low | 可选地为 `Policy` 加 `appliesTo?: string[]` 字段限定工具类型 |
+| S4 | §3.5 分类优先级 | 4 种分类无优先级规范；`"type error in test"` 同时含 type + test 关键字 | Medium | 明确优先级：`syntax_error > type_error > lint_violation > test_failure > unknown` |
+| S5 | §3.5 输出格式 | "支持常见格式（JUnit、tap、文本）"声明了但 PLAN 只实现简单文本解析，JUnit XML 和 TAP 协议未实现 | Medium | 删除 JUnit/TAP 声明，或 PLAN Task 8 中明确为"文本子集" |
+| S6 | §3.5 多传感器合并 | `Config.sensors` 含 `test/lint/typecheck` 三项，但 PLAN 的 `validate()` 只接收单个 `ToolResult`，未定义如何运行和合并多个传感器 | Medium | 明确：单个 `validate(result)` 处理一个传感器结果；多传感器由 Agent Loop 调度多次调用 |
+
+### 6.4 暴露的 PLAN 缺陷
+
+| # | PLAN 位置 | 缺陷 | 修复 |
+|---|----------|------|------|
+| P1 | Task 5 Step 3 `globMatch` | 代码有 2 bug：① `**/` 语义缺失（只转 `**` 导致 `**/.env` 变成 `..*/..env` 而不是 `(.*/)?.env`）；② 未 escape `.` 等正则特殊字符 | 替换为占位符方案代码（见 6.5 修订 diff） |
+| P2 | Task 4 Step 7 `shellExec` 签名 | `(args, opts?: { timeout?: number })` 不兼容 `Tool` 接口类型 | 将 `opts` 合并进 `ToolArgs` 或改用包装函数 |
+| P3 | Task 8 Step 3 `classifyFailure` | `lower.includes("expected") && lower.includes("to be")` 依赖隐式运算符优先级，可读性差 | 加括号明确：`(lower.includes("expected") && lower.includes("to be"))` |
+| P4 | Task 8 Step 7 `SensorConfig` | `{ test: string }` 不含 `lint`/`typecheck`，与 `Config.sensors` 类型不匹配 | 扩展为 `{ test: string; lint?: string; typecheck?: string }` |
+| P5 | Task 5 Step 1 `path_boundary` 测试 | "project-only" 规则用 `pattern: "."`，但 `resolve(".")` 依赖 CWD；测试在不同目录运行可能失败 | 使用绝对路径或在 test setup 中 mock `process.cwd()` |
+
+### 6.5 修订的 SPEC.md / PLAN.md diff 摘要
+
+> 完整修订见文件 `SPEC.md` 和 `PLAN.md`（本 session 已应用）。
+
+**SPEC.md 修订：**
+
+```diff
+§3.4.1 — 补充 glob 方言及 path_boundary 语义：
+
+- | **行为** | 逐条匹配策略规则（命令模式、路径边界、路径模式），返回首个匹配的决策 |
++ | **行为** | 逐条匹配策略规则（命令模式、路径边界、路径模式），返回首个匹配的决策。
++ | **glob 方言** | path_pattern 使用 POSIX glob 语义：`**` 匹配零个或多个路径段，`*` 匹配单层路径段（不含 `/`），`?` 匹配单个字符。pattern 中的 `.` 等正则特殊字符应作为字面量处理。
++ | **path_boundary 基准** | pattern 为相对于 PROJECT_DIR 的路径（而非 CWD），用于判定 action 的 `path` 是否越出边界。
+
+§3.5 — 澄清分类优先级及传感器调度：
+
+- | **行为** | 运行配置的传感器命令（test/lint/typecheck）→ 解析输出 → 客观判定 → 分类失败 |
++ | **行为** | 接收单个传感器的 ToolResult → 客观判定 → 解析失败 → 分类为以下之一：`syntax_error`、`type_error`、`lint_violation`、`test_failure`、`unknown`（按优先级顺序判定，首个命中即返回）。
++ | **调度** | 多传感器（test/lint/typecheck）由 Agent Loop 负责调度，分别调用 validate()，各自产生独立的 FeedbackReport。
++ | **输出格式** | 解析纯文本格式的测试/lint/类型检查输出（JUnit XML 和 TAP 协议为未来扩展，不在初版范围）。
+
+§6.1 Policy 类型 — 新增工具作用域说明：
+
++ | `appliesTo` | 可选字段，`string[]`，限定策略只作用于指定工具（如 `["shell_exec"]`）。未定义时作用于所有工具。 |
+```
+
+**PLAN.md 修订：**
+
+```diff
+P1 — Task 5 Step 3 globMatch 修复：
+
+- private globMatch(pattern: string, path: string): boolean {
+-   const regexStr = pattern
+-     .replace(/\*\*/g, ".*")
+-     .replace(/\*/g, "[^/]*")
+-     .replace(/\?/g, ".")
+-   return new RegExp(`^${regexStr}$`).test(path)
+- }
++ private globMatch(pattern: string, path: string): boolean {
++   let regexStr = pattern
++     .replace(/\*\*\//g, "\x00GLOBSTAR_SLASH\x00")
++     .replace(/\*\*/g, "\x00GLOBSTAR\x00")
++     .replace(/\*/g, "\x00STAR\x00")
++     .replace(/\?/g, "\x00QUESTION\x00")
++   regexStr = regexStr.replace(/[.+?^${}()|[\]\\]/g, "\\$&")
++   regexStr = regexStr
++     .replace(/\x00GLOBSTAR_SLASH\x00/g, "(.*/)?")
++     .replace(/\x00GLOBSTAR\x00/g, ".*")
++     .replace(/\x00STAR\x00/g, "[^/]*")
++     .replace(/\x00QUESTION\x00/g, ".")
++   return new RegExp(`^${regexStr}$`).test(path)
++ }
+
+P2 — Task 4 Step 7 shellExec 签名修复：
+
+- export const shellExec: Tool = async (args, opts?: { timeout?: number }) => {
++ export const shellExec: Tool = async (args) => {
+    ...
+-   const timeout = opts?.timeout ?? 30000
++   const timeout = (args as any).timeoutMs ?? 30000
+
+P3 — Task 8 Step 3 classifyFailure 运算符优先级：
+
+- if (lower.includes("fail") || lower.includes("assertion") || lower.includes("expected") && lower.includes("to be")) {
++ if (lower.includes("fail") || lower.includes("assertion") || (lower.includes("expected") && lower.includes("to be"))) {
+
+P4 — Task 8 Step 7 SensorConfig：
+
+- interface SensorConfig {
+-   test: string
+- }
++ interface SensorConfig {
++   test: string
++   lint?: string
++   typecheck?: string
++ }
+
+P5 — Task 5 Step 5 path_boundary 策略 pattern（改为显式路径说明）：
+
++ // 注：pattern "." 相对于 PROJECT_DIR 解析，而非 CWD。
++ // Agent Loop 在初始化 PolicyEngine 时需注入 PROJECT_DIR 作为 resolve 基准。
+```
+
+### 6.6 结论与建议
+
+**SPEC 缺陷总结**：
+1. **glob 方言未指定（S1）**是最大缺陷：导致 PLAN 中 `globMatch` 代码是错的，agent 必须自行 debug。修复代价不高，但浪费了约 50% 的 Task 5 实现时间。
+2. **path_boundary 基准不明确（S2）**是 latent bug：当前测试通过只是因为恰好在 CWD = project root 时运行。一旦集成其他模块（如 Web Server 的工作目录），行为会断裂。
+3. **分类优先级（S4）**和**传感器调度（S6）**是中等缺陷：PLAN 的实现是模糊正确的，但未来维护者会因缺乏规范而困惑。
+
+**PLAN 缺陷总结**：
+1. **`globMatch` 代码错误（P1）** 是唯一的 critical bug：如果 agent 完全照搬而不测，会得到错的实现。
+2. **`shellExec` 签名不兼容 `Tool` 类型（P2）** 是另一个类型级 bug，会在 Task 4 实现时暴露（当前尚未实现 Task 4）。
+
+**整体评价**：冷启动 agent 成功实现了 Task 5 和 Task 8（18 tests pass），没有中途暂停询问用户。但它被迫 **偏离 PLAN 代码进行了多处修正** ——这些修正是正确的（修复了 PLAN 的 bug），但说明 PLAN 的代码不够"可靠"到让一个独立 agent 直接照搬执行。这是 PLAN 质量的主要短板。
+
+**改进建议**：
+- PLAN 中每段代码在撰写前都应先跑一遍测试（或让 agent 在 writing-plans 阶段做 TDD dry-run），而非仅凭经验手写。
+- glob 和 path 匹配这类领域特定的函数，应在 SPEC 中明确语义规范（dialect、escaping rules、resolve base），不能依赖 agent 自行 debug 修正。

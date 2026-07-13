@@ -139,6 +139,41 @@
 | **当前状态** | 2/20 task 完成，全部通过评审。分支 feat/initial-implementation 上有 3 个 commit。 |
 | **教训** | subagent-driven-development 技能建议"不要在 task 之间暂停"，但用户的判断优先。暂停让用户有机会检查进度和方向。 |
 
+### 15:17 — Task 5: Policy Engine (Cold-start 实现)
+
+| 项 | 内容 |
+|---|---|
+| **时间戳** | 2026-07-13 15:17 |
+| **Task** | 5 — Policy Engine (Governance — Focus) |
+| **Superpowers 技能** | `brainstorming` + `test-driven-development` |
+| **Agent** | 不同 agent session（冷启动验证，无对话历史） |
+| **操作** | TDD: 写 policy.test.ts → RED → 写 policy.ts → GREEN（首次尝试失败，globMatch bug）→ 修复为占位符方案 → GREEN（5 tests pass） |
+| **关键发现** | PLAN 的 `globMatch` 代码有 2 个 bug：① `**` 替换不处理嵌套通配 ② 未 escape `.` 等正则特殊字符。PLAN 代码无法通过自身测试 |
+| **教训** | PLAN 中的正则/解析类代码如果仅凭经验手写、不经测试验证，会在实现阶段暴露。冷启动 agent 需要自行 debug 修正，浪费时间 |
+
+### 15:20 — Task 8: Feedback System (Cold-start 实现)
+
+| 项 | 内容 |
+|---|---|
+| **时间戳** | 2026-07-13 15:20 |
+| **Task** | 8 — Feedback System (validator + classifier) |
+| **Superpowers 技能** | `test-driven-development` |
+| **Agent** | 同上（冷启动验证） |
+| **操作** | TDD: classifier.test.ts → RED → classifier.ts → GREEN（5 pass）。validator.test.ts → RED → validator.ts → GREEN（3 pass） |
+| **关键发现** | 1) PLAN 的 SensorConfig 只有 `{ test: string }`，与 SPEC §3.5 的三传感器配置不一致。Agent 自行加了 `lint/typecheck` 可选字段。2) `classifyFailure` 的 `||`/`&&` 优先级虽碰巧正确但可读性差 |
+| **教训** | PLAN 中的接口类型应与 SPEC 定义保持一致（至少字段对齐），避免 agent 被迫偏离 PLAN |
+
+### 15:22 — 冷启动验证记录与 SPEC/PLAN 修订
+
+| 项 | 内容 |
+|---|---|
+| **时间戳** | 2026-07-13 15:22 |
+| **阶段** | 冷启动验证 + 修订 |
+| **操作** | 1) 在 SPEC_PROCESS.md §六 中记录完整观察结果（O1-O4 观察节点、D1-D4 分歧、S1-S6 spec 缺陷、P1-P5 plan 缺陷）2) 修订 SPEC.md：§3.4.1 补充 glob 方言和 path_boundary 基准、§3.5 补充分类优先级和传感器调度、§6.1 Policy 新增 appliesTo 字段 3) 修订 PLAN.md：P1 修复 globMatch 为占位符方案、P2 修复 shellExec 签名、P3 classifyFailure 加括号、P4 SensorConfig 扩展为三传感器、P5 新增 path_boundary 测试 |
+| **关键修复** | P1 (globMatch) 是最严重的 PLAN bug：如果 agent 完全照搬不测试，会得到错误实现。P2 (shellExec 签名) 会在 Task 4 实现时导致类型不兼容 |
+| **总测试结果** | 18 tests / 5 files — all PASS |
+| **教训** | 冷启动验证的核心价值在于发现 PLAN 代码的 latent bug——这些 bug 只在实现时才暴露，此时修复代价比在 PLAN 阶段发现要大得多 |
+
 ---
 
 ## 待续
