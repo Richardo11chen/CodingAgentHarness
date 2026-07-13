@@ -85,9 +85,14 @@ export class Harness {
         if (govResult.decision === "ask") {
           hitl.requestApproval(response.action)
           tracer.record({ type: "approval_request", data: { action: response.action, policy: govResult.policy } })
-          // In test mode, auto-deny (no real user to approve)
-          hitl.deny()
-          context.push({ role: "user", content: `Action auto-denied (no user): ${govResult.policy?.message ?? ""}` })
+          const approvedAction = await hitl.waitForApproval()
+          if (approvedAction) {
+            const result = await sandbox.run(tools[approvedAction.tool ?? ""], approvedAction.args ?? {})
+            tracer.record({ type: "tool_result", data: result })
+            context.push({ role: "user", content: `Tool result: ${JSON.stringify(result)}` })
+          } else {
+            context.push({ role: "user", content: `Action denied: ${govResult.policy?.message ?? ""}` })
+          }
           continue
         }
 
