@@ -16,4 +16,4 @@ COPY --from=builder /app/package.json ./
 COPY --from=builder /app/.harness ./.harness
 EXPOSE 3000
 ENV NODE_ENV=production
-CMD ["node", "dist/web/server.js"]
+CMD ["node", "dist/index.js"]
