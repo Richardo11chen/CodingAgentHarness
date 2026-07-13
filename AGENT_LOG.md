@@ -318,6 +318,22 @@
 | **review 结果** | Spec ✅, Quality Approved, Verdict: PASS。所有 issue 均继承自 brief，不影响通过的测试和类型检查 |
 | **教训** | RealLLMProvider 的 fetch mock 用 global.fetch = vi.fn() 是进程级 mutation——如果测试套件增长可能脆弱。生产环境应考虑 per-test scoped mock |
 
+### 17:45 — Task 14: Credential Management
+
+| 项 | 内容 |
+|---|---|
+| **时间戳** | 2026-07-13 17:45 |
+| **Task** | 14 — Credential Management (keychain + env fallback) |
+| **Superpowers 技能** | `subagent-driven-development` + `test-driven-development` |
+| **Implementer subagent** | 派发 general subagent，提供 task-14-brief.md |
+| **subagent 输出** | Status: DONE_WITH_CONCERNS。创建了 src/credentials/keychain.ts + env.ts + 对应测试 |
+| **commit** | `17b0438` — `feat: credential management — keychain store and env fallback` |
+| **subagent 关注点** | 1) brief 的 keytar mock 总是返回相同值，会导致 3/4 测试失败——改为 stateful Map-based mock（标准 keytar mocking），4 个 test assertion 保持 verbatim；2) brief 的 EnvStore.load() 有 no-op ternary（两分支相同），保持 verbatim |
+| **人工干预** | 无（mock deviation 合理——brief 自身矛盾，test is spec） |
+| **Task reviewer** | 派发 general subagent |
+| **review 结果** | Spec ✅, Quality Approved, Verdict: PASS。确认 keytar mock deviation 合理且必要——brief 的 mock 与自身 test 矛盾。文件权限用 writeFileSync({mode:0o600}) + chmodSync 双保险 |
+| **教训** | keytar 的 mock 需要是 stateful 的（模拟真实 keychain 语义）——简单的 mockResolvedValue 不够，因为 get/set/delete 需要相互影响。这是 credential 测试的关键 |
+
 ---
 
 ## 待续
