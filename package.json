@@ -2,6 +2,9 @@
   "name": "coding-agent-harness",
   "version": "0.1.0",
   "type": "module",
+  "bin": {
+    "coding-agent-harness": "dist/index.js"
+  },
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",

@@ -1,9 +1,9 @@
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { ChatPanel } from "./components/ChatPanel"
 import { MonitorPanel } from "./components/MonitorPanel"
 import { ApprovalModal } from "./components/ApprovalModal"
 import { useWebSocket } from "./hooks/useWebSocket"
-import type { TraceEvent } from "../core/types"
+import type { TraceEvent } from "../../core/types"
 
 export function App() {
   const { events, connected } = useWebSocket()
@@ -13,22 +13,26 @@ export function App() {
 
   const handleSend = useCallback(async (message: string) => {
     setMessages((prev) => [...prev, { role: "user", content: message }])
-    if (!sessionId) {
+    let sid = sessionId
+    if (!sid) {
       const res = await fetch("/api/sessions", { method: "POST" })
       const data = await res.json()
-      setSessionId(data.id)
+      sid = data.id
+      setSessionId(sid)
     }
-    await fetch(`/api/sessions/${sessionId}/message`, {
+    await fetch(`/api/sessions/${sid}/message`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message }),
     })
   }, [sessionId])
 
-  const approvalEvent = events.find((e) => e.type === "approval_request")
-  if (approvalEvent && !pendingApproval) {
-    setPendingApproval(approvalEvent.data as any)
-  }
+  useEffect(() => {
+    const approvalEvent = events.find((e) => e.type === "approval_request")
+    if (approvalEvent && !pendingApproval) {
+      setPendingApproval(approvalEvent.data as any)
+    }
+  }, [events, pendingApproval])
 
   const handleApprove = async () => {
     await fetch(`/api/sessions/${sessionId}/approve`, {

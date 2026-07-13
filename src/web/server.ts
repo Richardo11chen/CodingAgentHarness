@@ -15,7 +15,10 @@ import { shellExec } from "../core/tools/shell.js"
 import { runTest } from "../core/tools/test-runner.js"
 import type { Tool } from "../core/tools/file.js"
 import { KeychainStore } from "../credentials/keychain.js"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 export interface ServerDeps {
   llm: LLMProvider
@@ -26,6 +29,7 @@ export interface ServerDeps {
 export async function createHarnessServer(deps: ServerDeps): Promise<{ server: import("node:http").Server; port: number }> {
   const app = express()
   app.use(express.json())
+  app.use(express.static(join(__dirname, "..", "..", "dist", "frontend")))
 
   const server = createServer(app)
   const wss = new WebSocketServer({ server, path: "/ws" })
@@ -116,6 +120,11 @@ export async function createHarnessServer(deps: ServerDeps): Promise<{ server: i
   app.delete("/api/credentials", async (_req, res) => {
     await credentialStore.delete("api_key")
     res.json({ status: "ok" })
+  })
+
+  // SPA catch-all: serve index.html for non-API routes
+  app.get("*", (_req, res) => {
+    res.sendFile(join(__dirname, "..", "..", "dist", "frontend", "index.html"))
   })
 
   return new Promise((resolve) => {

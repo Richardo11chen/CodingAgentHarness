@@ -8,6 +8,7 @@ import { FeedbackValidator } from "./feedback/validator.js"
 import { MemoryStore } from "./memory.js"
 import { Tracer } from "./tracer.js"
 import type { Tool } from "./tools/file.js"
+import { shellExec } from "./tools/shell.js"
 
 export interface HarnessDeps {
   llm: LLMProvider
@@ -108,9 +109,13 @@ export class Harness {
 
         // Feedback if code changed
         if (response.action.changedCode) {
-          const report = feedback.validate(result)
-          tracer.record({ type: "feedback", data: report })
-          context.push({ role: "user", content: `Feedback: ${JSON.stringify(report)}` })
+          const sensorCommands = [config.sensors.test, config.sensors.lint, config.sensors.typecheck].filter(Boolean)
+          for (const command of sensorCommands) {
+            const sensorResult = await shellExec({ command })
+            const report = feedback.validate(sensorResult)
+            tracer.record({ type: "feedback", data: report })
+            context.push({ role: "user", content: `Feedback: ${JSON.stringify(report)}` })
+          }
         }
 
         context.push({ role: "user", content: `Tool result: ${JSON.stringify(result)}` })
