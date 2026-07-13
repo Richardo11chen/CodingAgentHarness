@@ -334,6 +334,22 @@
 | **review 结果** | Spec ✅, Quality Approved, Verdict: PASS。确认 keytar mock deviation 合理且必要——brief 的 mock 与自身 test 矛盾。文件权限用 writeFileSync({mode:0o600}) + chmodSync 双保险 |
 | **教训** | keytar 的 mock 需要是 stateful 的（模拟真实 keychain 语义）——简单的 mockResolvedValue 不够，因为 get/set/delete 需要相互影响。这是 credential 测试的关键 |
 
+### 18:00 — Task 15: WebUI Backend
+
+| 项 | 内容 |
+|---|---|
+| **时间戳** | 2026-07-13 18:00 |
+| **Task** | 15 — WebUI Backend (Express API + WebSocket) |
+| **Superpowers 技能** | `subagent-driven-development` + `test-driven-development` |
+| **Implementer subagent** | 派发 general subagent，提供 task-15-brief.md |
+| **subagent 输出** | Status: DONE_WITH_CONCERNS。创建了 src/web/server.ts（Express + WebSocket，REST API + 实时事件推送） |
+| **commit** | `eaf9577` — `feat: WebUI backend — Express API + WebSocket event streaming` |
+| **subagent 关注点** | 1) 添加 vi.mock("keytar")——keytar 的 native binding 在 headless Linux 缺 libsecret-1.so.0，无法 import server 模块。Mock 与 Task 14 的 pattern 一致；2) brief 的 Files 列表提到 routes/ 但 Step 3 是 monolithic server.ts，按 verbatim Step 3 实现；3) PUT /api/config 无验证、无并发控制、server.close() 不关 wss——均 verbatim from brief |
+| **人工干预** | 无 |
+| **Task reviewer** | 派发 general subagent |
+| **review 结果** | Spec ✅, Quality Approved, Verdict: PASS。确认 keytar mock 合理且必要（与 Task 14 pattern 一致）。WebSocket 集成正确——Tracer callback 广播到 wss.clients，有 readyState === 1 guard |
+| **教训** | keytar 的 native binding 在 headless Linux 环境会失败——任何 import keytar 的模块在测试时都需要 mock。这是跨 task 的环境约束，应在 PLAN 中提前说明 |
+
 ---
 
 ## 待续
