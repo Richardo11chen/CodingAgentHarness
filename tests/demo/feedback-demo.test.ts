@@ -25,7 +25,7 @@ describe("Demo ②: Feedback loop drives correction", () => {
     const config: Config = {
       llm: { provider: "mock", model: "mock", baseURL: "" },
       tools: ["file_write", "run_test"], policies: "",
-      sensors: { test: "npm test", lint: "", typecheck: "" },
+      sensors: { test: 'echo "FAIL: assertion error" && exit 1', lint: "", typecheck: "" },
       sandbox: { timeout: 30, maxMemory: 512 }, maxSteps: 50, timeout: 300,
     }
     const mock = new MockLLMProvider([
