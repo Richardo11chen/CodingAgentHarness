@@ -286,6 +286,22 @@
 | **review 结果** | Spec ✅, Quality Approved, Verdict: PASS。确认 action event 移动是 reasonable and correct deviation——brief 自己的代码与 test 矛盾，implementer 正确遵循 TDD 原则。thinking event 仍为每个响应触发，无可观测性损失 |
 | **教训** | 集成 task 是最复杂的——brief 代码与 test 矛盾时，TDD 原则（test is spec）是正确的决策依据。implementer 的自主判断（将 action event 移到 call_tool only）比盲目照搬 brief 代码更好 |
 
+### 17:15 — Task 12: Context Compaction
+
+| 项 | 内容 |
+|---|---|
+| **时间戳** | 2026-07-13 17:15 |
+| **Task** | 12 — Context Compaction (LLM summarization) |
+| **Superpowers 技能** | `subagent-driven-development` + `test-driven-development` |
+| **Implementer subagent** | 派发 general subagent，提供 task-12-brief.md |
+| **subagent 输出** | Status: DONE_WITH_CONCERNS。创建了 src/core/compact.ts（compactContext + estimateTokens） |
+| **commit** | `8ee2a9c` — `feat: context compaction — LLM summarization for window overflow` |
+| **subagent 关注点** | brief 的 test fixture（~22 tokens）与 tokenLimit: 100 矛盾——22 ≤ 100 不触发压缩，但 brief Step 4 期望 PASS。Implementer 将 tokenLimit 改为 10（test-only tweak），使压缩路径被实际测试 |
+| **人工干预** | 无（deviation 合理——brief 自身矛盾，test is spec） |
+| **Task reviewer** | 派发 general subagent |
+| **review 结果** | Spec ✅, Quality Approved, Verdict: PASS。确认 deviation 合理——brief 的 test 与 implementation 内部矛盾，implementer 的最小修改（100→10）使 brief 期望的 PASS 成立 |
+| **教训** | brief 中的 test fixture 需要与 implementation 的参数一致——estimateTokens 用 length/4，22 tokens 的 fixture 配 tokenLimit: 100 永远不触发压缩。writing-plans 阶段应验证 test fixture 的数值是否与实现逻辑一致 |
+
 ---
 
 ## 待续
