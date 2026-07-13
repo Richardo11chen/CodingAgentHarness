@@ -367,6 +367,22 @@
 | **review 结果** | Spec ✅, Quality Issues Found (all inherited from brief), Verdict: PASS。Issues: React anti-pattern (setPendingApproval in render)、race condition (stale sessionId)、dead state (ws/setWs unused)、tsc strict mode violation (no jsx in tsconfig)。vite.config.ts deviation 合理且必要 |
 | **教训** | 前端 task 的 TDD 不如后端严格——React 组件没有单元测试框架。Vite build 成功是主要验证手段。brief 中的 React 代码有 anti-pattern（render 中 setState），应在后续重构中修复为 useEffect |
 
+### 18:30 — Task 17: Dockerfile
+
+| 项 | 内容 |
+|---|---|
+| **时间戳** | 2026-07-13 18:30 |
+| **Task** | 17 — Dockerfile (multi-stage build) |
+| **Superpowers 技能** | `subagent-driven-development` |
+| **Implementer subagent** | 派发 general subagent，提供 task-17-brief.md |
+| **subagent 输出** | Status: DONE_WITH_CONCERNS。创建了 Dockerfile + .dockerignore |
+| **commit** | `2c0b5f9` — `feat: Dockerfile — multi-stage build for production` |
+| **subagent 关注点** | 1) Docker 未安装，无法验证 build；2) keytar native dependency 在 node:22-slim 可能需要 libsecret-1-dev；3) tsc 将 tests/ 编译进 dist |
+| **人工干预** | 无 |
+| **Task reviewer** | 派发 general subagent |
+| **review 结果** | Spec ✅, Quality Issues Found (inherited from brief), Verdict: PASS。Issues: runtime image 含 devDependencies、tsc 编译 tests、keytar native 风险、build 未验证。Layer caching 正确 |
+| **教训** | Dockerfile 中 keytar 的 native binding 是一个已知风险——在 slim 镜像中可能需要额外安装 libsecret-1-dev。生产环境应考虑用 .env 回退方案替代 keytar |
+
 ---
 
 ## 待续
