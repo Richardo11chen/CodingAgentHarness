@@ -383,6 +383,22 @@
 | **review 结果** | Spec ✅, Quality Issues Found (inherited from brief), Verdict: PASS。Issues: runtime image 含 devDependencies、tsc 编译 tests、keytar native 风险、build 未验证。Layer caching 正确 |
 | **教训** | Dockerfile 中 keytar 的 native binding 是一个已知风险——在 slim 镜像中可能需要额外安装 libsecret-1-dev。生产环境应考虑用 .env 回退方案替代 keytar |
 
+### 18:40 — Task 18: CI/CD
+
+| 项 | 内容 |
+|---|---|
+| **时间戳** | 2026-07-13 18:40 |
+| **Task** | 18 — CI/CD (.gitlab-ci.yml) |
+| **Superpowers 技能** | `subagent-driven-development` |
+| **Implementer subagent** | 派发 general subagent，提供 task-18-brief.md |
+| **subagent 输出** | Status: DONE_WITH_CONCERNS。创建了 .gitlab-ci.yml（unit-test + build-docker + deploy 三阶段） |
+| **commit** | `a66c733` — `ci: GitLab CI with unit-test, docker build, and deploy stages` |
+| **subagent 关注点** | 1) "最后一次 CI 必须 pass"无法本地验证——无 GitLab 实例；2) deploy job 无 image（verbatim）；3) build-docker/deploy 仅在 main 分支运行，当前在 feature 分支 |
+| **人工干预** | 无 |
+| **Task reviewer** | 派发 general subagent |
+| **review 结果** | Spec ✅, Quality Approved, Verdict: PASS。YAML 语法正确，stage 结构（test→build→deploy）正确 |
+| **教训** | CI 配置的"最后一次必须 pass"要求需要在 GitLab 上实际运行 pipeline 才能验证——这是部署阶段的工作 |
+
 ---
 
 ## 待续
