@@ -446,6 +446,23 @@
 | **commit 数** | 约 25 个 commit（含 SPEC/PLAN/AGENT_LOG 文档 + 20 个 task 实现 + 1 个 fix） |
 | **下一步** | 最终全分支评审（requesting-code-review）→ finishing-a-development-branch |
 
+### 22:45 — 最终全分支评审 + Fix
+
+| 项 | 内容 |
+|---|---|
+| **时间戳** | 2026-07-13 22:45 |
+| **阶段** | 最终全分支评审 |
+| **Superpowers 技能** | `requesting-code-review`（最终评审） |
+| **操作** | 派发 final code reviewer subagent，提供完整分支 diff（34 commits, 446KB）+ SPEC + PLAN |
+| **review 结果** | Overall: Needs fixes。发现 2 Critical + 14 Important 问题 |
+| **Critical 问题** | 1) tsconfig.json 缺 "jsx": "react-jsx"——tsc 失败、Docker build 断裂；2) 反馈闭环未运行传感器——loop 验证 file_write 的 ToolResult 而非传感器结果，feedback 永远 passed:true |
+| **Important 问题** | 3) server 未 serve 静态前端；4) 未创建 RealLLMProvider；5) 缺 src/index.ts 入口；6) 缺 bin 字段；7) React anti-pattern（render 中 setState）；8) handleSend race condition；9) App.tsx import 路径错误 |
+| **Fix subagent** | 派发一个 fix subagent 处理所有 Critical + key Important 问题。Subagent 被中断但修改已完整——72 测试通过、tsc exit 0、vite build 成功 |
+| **commit (fix)** | `b932374` — `fix: final review fixes — tsconfig jsx, feedback sensors, static frontend, React anti-patterns, entry point, bin field` |
+| **fix 内容** | 1) tsconfig.json 加 "jsx": "react-jsx"；2) loop.ts 改为运行 config.sensors 传感器命令并 validate 结果；3) server.ts 加 express.static serve 前端；4) 创建 src/index.ts 入口；5) App.tsx 修复 setPendingApproval 移到 useEffect、handleSend race condition 修复、import 路径修复；6) package.json 加 bin 字段 |
+| **人工干预** | 无（fix subagent 自主完成，虽被中断但修改完整） |
+| **教训** | 最终全分支评审发现了 task-level review 遗漏的跨 task 集成问题——tsconfig 的 jsx 设置、反馈闭环的传感器调度、前端静态文件 serving。这些问题在单个 task review 中不可见，只有全分支视角才能发现 |
+
 ---
 
 ## 实现阶段总结
