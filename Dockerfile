@@ -6,7 +6,7 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 RUN npx vite build
-RUN npx tsc --outDir dist
+RUN npx tsc -p tsconfig.build.json
 
 # Stage 2: Runtime
 FROM node:22-slim
