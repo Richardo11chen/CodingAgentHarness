@@ -1,6 +1,7 @@
 # Stage 1: Builder
 FROM node:22-slim AS builder
 WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends libsecret-1-dev && rm -rf /var/lib/apt/lists/*
 COPY package*.json ./
 RUN npm ci
 COPY . .
@@ -10,6 +11,7 @@ RUN npx tsc --outDir dist
 # Stage 2: Runtime
 FROM node:22-slim
 WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends libsecret-1-0 && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./
