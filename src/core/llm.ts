@@ -27,9 +27,48 @@ export interface RealLLMConfig {
 
 export class RealLLMProvider implements LLMProvider {
   private config: RealLLMConfig
+  private callCounter = 0
 
   constructor(config: RealLLMConfig) {
     this.config = config
+  }
+
+  private convertMessages(messages: Message[]): any[] {
+    const result: any[] = []
+    let toolCallId = 0
+
+    for (let i = 0; i < messages.length; i++) {
+      const m = messages[i]
+
+      if (m.role === "assistant" && m.action?.type === "call_tool") {
+        const id = `call_${toolCallId++}`
+        result.push({
+          role: "assistant",
+          content: m.content || null,
+          tool_calls: [{
+            id,
+            type: "function",
+            function: {
+              name: m.action.tool,
+              arguments: JSON.stringify(m.action.args ?? {}),
+            },
+          }],
+        })
+
+        if (i + 1 < messages.length && messages[i + 1].role === "user" && messages[i + 1].content.startsWith("Tool result:")) {
+          i++
+          result.push({
+            role: "tool",
+            tool_call_id: id,
+            content: messages[i].content,
+          })
+        }
+      } else {
+        result.push({ role: m.role, content: m.content })
+      }
+    }
+
+    return result
   }
 
   async complete(messages: Message[], options?: LLMOptions): Promise<LLMResponse> {
@@ -70,7 +109,7 @@ export class RealLLMProvider implements LLMProvider {
 
     const body = {
       model: options?.model ?? this.config.model,
-      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      messages: this.convertMessages(messages),
       tools,
       temperature: options?.temperature ?? 0.7,
       max_tokens: options?.maxTokens ?? 4096,
@@ -92,14 +131,15 @@ export class RealLLMProvider implements LLMProvider {
 
     const data = await res.json()
     const message = data.choices[0].message
-    const text = message.content ?? ""
+    const text = message.content || message.reasoning_content || ""
     const toolCall = message.tool_calls?.[0]
 
     if (!toolCall) {
       return { text, action: { type: "done", text } }
     }
 
-    const args = JSON.parse(toolCall.function.arguments)
+    let args: any = {}
+    try { args = JSON.parse(toolCall.function.arguments) } catch {}
     return {
       text,
       action: {

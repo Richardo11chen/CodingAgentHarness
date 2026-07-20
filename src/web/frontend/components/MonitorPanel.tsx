@@ -12,6 +12,8 @@ export function MonitorPanel({ events }: { events: TraceEvent[] }) {
     return map[type] ?? "•"
   }
 
+  const filtered = events.filter((e) => !(e.type === "done" && (e as any).data?.steps === undefined))
+
   if (!expanded) {
     return (
       <div
@@ -19,7 +21,7 @@ export function MonitorPanel({ events }: { events: TraceEvent[] }) {
         style={{ width: "48px", cursor: "pointer", background: "#f3f4f6", padding: "8px", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}
       >
         <span>📊</span>
-        <span style={{ writingMode: "vertical-rl", fontSize: "12px" }}>监控 ({events.length})</span>
+        <span style={{ writingMode: "vertical-rl", fontSize: "12px" }}>监控 ({filtered.length})</span>
       </div>
     )
   }
@@ -29,7 +31,7 @@ export function MonitorPanel({ events }: { events: TraceEvent[] }) {
       <div onClick={() => setExpanded(false)} style={{ cursor: "pointer", marginBottom: "8px", fontWeight: "bold" }}>
         监控 ▶
       </div>
-      {events.slice(-50).map((e, i) => (
+      {filtered.slice(-50).map((e, i) => (
         <div key={i} style={{ marginBottom: "4px", fontSize: "12px", fontFamily: "monospace" }}>
           {icon(e.type)} {e.type}: {JSON.stringify(e.data).slice(0, 80)}
         </div>

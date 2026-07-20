@@ -14,7 +14,8 @@ import { fileRead, fileWrite, fileDelete } from "../core/tools/file.js"
 import { shellExec } from "../core/tools/shell.js"
 import { runTest } from "../core/tools/test-runner.js"
 import type { Tool } from "../core/tools/file.js"
-import { KeychainStore } from "../credentials/keychain.js"
+import { KeychainStore, type CredentialStore } from "../credentials/keychain.js"
+import { EnvStore } from "../credentials/env.js"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -33,9 +34,22 @@ export async function createHarnessServer(deps: ServerDeps): Promise<{ server: i
 
   const server = createServer(app)
   const wss = new WebSocketServer({ server, path: "/ws" })
+  wss.on("connection", (ws) => {
+    console.log(`WebSocket client connected (total: ${wss.clients.size})`)
+    ws.on("close", () => console.log("WebSocket client disconnected"))
+  })
 
   const sessions = new Map<string, { harness: Harness; hitl: HitlStateMachine; tracer: Tracer }>()
-  const credentialStore = new KeychainStore("coding-agent-harness")
+  const envStore = new EnvStore(join(deps.projectDir, ".harness", ".env"))
+  let credentialStore: CredentialStore
+  try {
+    const kc = new KeychainStore("coding-agent-harness")
+    await kc.get("__probe__")
+    credentialStore = kc
+  } catch {
+    credentialStore = envStore
+    console.log("keytar not available, using .env fallback for credentials")
+  }
 
   // Health check
   app.get("/api/health", (_req, res) => {
@@ -69,10 +83,17 @@ export async function createHarnessServer(deps: ServerDeps): Promise<{ server: i
   app.post("/api/sessions/:id/message", async (req, res) => {
     const session = sessions.get(req.params.id)
     if (!session) return res.status(404).json({ error: "session not found" })
+    if (!deps.llm) return res.status(400).json({ error: "No LLM configured. Set OPENAI_API_KEY env var or configure via WebUI." })
     const { message } = req.body
     session.harness.run(message).then((result) => {
+      console.log(`Harness completed: steps=${result.steps}, answer=${result.answer?.slice(0, 50)}`)
       wss.clients.forEach((client) => {
         if (client.readyState === 1) client.send(JSON.stringify({ type: "done", data: result }))
+      })
+    }).catch((err) => {
+      console.error(`Harness error: ${err.message}`)
+      wss.clients.forEach((client) => {
+        if (client.readyState === 1) client.send(JSON.stringify({ type: "error", data: { message: err.message } }))
       })
     })
     res.json({ status: "started" })
@@ -128,9 +149,8 @@ export async function createHarnessServer(deps: ServerDeps): Promise<{ server: i
   })
 
   return new Promise((resolve) => {
-    server.listen(0, () => {
-      const addr = server.address()
-      const port = typeof addr === "object" && addr ? addr.port : 3000
+    const port = parseInt(process.env.PORT ?? "3000", 10)
+    server.listen(port, () => {
       resolve({ server, port })
     })
   })

@@ -3,9 +3,10 @@ import { useState } from "react"
 interface ChatPanelProps {
   onSend: (message: string) => void
   messages: { role: string; content: string }[]
+  onClear?: () => void
 }
 
-export function ChatPanel({ onSend, messages }: ChatPanelProps) {
+export function ChatPanel({ onSend, messages, onClear }: ChatPanelProps) {
   const [input, setInput] = useState("")
 
   const handleSend = () => {
@@ -37,6 +38,7 @@ export function ChatPanel({ onSend, messages }: ChatPanelProps) {
           placeholder="输入消息..."
         />
         <button onClick={handleSend} style={{ padding: "8px 16px" }}>发送</button>
+        {onClear && <button onClick={onClear} style={{ padding: "8px 16px" }}>清空</button>}
       </div>
     </div>
   )
