@@ -4,6 +4,7 @@ import { MonitorPanel } from "./components/MonitorPanel"
 import { ApprovalModal } from "./components/ApprovalModal"
 import { SettingsModal } from "./components/SettingsModal"
 import { useWebSocket } from "./hooks/useWebSocket"
+import { theme } from "./theme"
 
 const MSG_KEY = "harness_messages"
 const SID_KEY = "harness_session"
@@ -115,7 +116,10 @@ export function App() {
   }, [persistMsgs])
 
   return (
-    <div style={{ display: "flex", height: "100vh", fontFamily: "system-ui, sans-serif" }}>
+    <div style={{
+      display: "flex", height: "100vh", background: theme.bg.marketing,
+      fontFamily: theme.font.family, fontFeatureSettings: theme.font.features,
+    }}>
       <ChatPanel onSend={handleSend} messages={messages} onClear={handleClear} />
       <MonitorPanel events={events} />
       <ApprovalModal
@@ -124,11 +128,26 @@ export function App() {
         onApprove={handleApprove}
         onDeny={handleDeny}
       />
-      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, padding: "4px 16px", background: "#f3f4f6", fontSize: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span>{connected ? "🟢 Connected" : "🔴 Disconnected"} | Session: {sessionId ?? "none"} | Events: {events.length}</span>
-        <button onClick={() => setShowSettings(true)} style={{ padding: "2px 12px", fontSize: "12px", border: "1px solid #ccc", borderRadius: "4px", background: "white", cursor: "pointer" }}>设置</button>
-      </div>
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      <div style={{
+        position: "fixed", bottom: 0, left: 0, right: 0, padding: "6px 16px",
+        background: theme.bg.panel, borderTop: `1px solid ${theme.border.subtle}`,
+        fontSize: "12px", display: "flex", justifyContent: "space-between", alignItems: "center",
+        color: theme.text.tertiary,
+      }}>
+        <span>
+          <span style={{ color: connected ? theme.status.green : theme.status.red }}>
+            {connected ? "●" : "●"}{" "}
+          </span>
+          {connected ? "Connected" : "Disconnected"} | Session: {sessionId ?? "none"} | Events: {events.length}
+        </span>
+        <button onClick={() => setShowSettings(true)} style={{
+          padding: "4px 14px", fontSize: "12px", border: `1px solid ${theme.border.standard}`,
+          borderRadius: theme.radius.standard, background: theme.bg.translucent,
+          color: theme.text.secondary, cursor: "pointer",
+          fontFamily: theme.font.family, fontWeight: 510,
+        }}>设置</button>
+      </div>
     </div>
   )
 }

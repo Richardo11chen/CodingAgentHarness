@@ -77,7 +77,7 @@ SPEC 中写了"path_pattern 使用 glob 匹配文件路径"，但没有指定 gl
 
 2. **PLAN 中的代码应先跑测试**。冷启动发现 `globMatch` 有 bug——如果 writing-plans 阶段就跑了测试，bug 会在计划阶段被修复。
 
-3. **前端应该用 Open Design**。需求文档强烈推荐，但我没有使用。重做会先调研其设计系统再决定方案。
+3. **前端应该更早用 Open Design**。需求文档强烈推荐 Open Design，我在实现后期才真正应用其 Linear 设计系统。如果重做，会在 PLAN 阶段就为前端 task 指定设计 tokens，而不是先写内联样式再返工。
 
 ## 八、对 Superpowers 方法论的批判
 
