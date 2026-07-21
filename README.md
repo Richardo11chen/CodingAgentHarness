@@ -196,3 +196,24 @@ npx vitest run tests/demo/
 - 沙箱的内存限制通过 `--max-old-space-size` 实现，非 cgroup 级隔离
 - 前端 MonitorPanel 通过 WebSocket 实时推送追踪事件，无断线重连
 - LLM 供应商需兼容 OpenAI Chat Completions API 格式
+
+## 第三方依赖与许可证
+
+本项目使用以下开源第三方库：
+
+| 库 | 用途 | 许可证 |
+|----|------|--------|
+| [express](https://github.com/expressjs/express) | Web 服务器 | MIT |
+| [ws](https://github.com/websockets/ws) | WebSocket | MIT |
+| [keytar](https://github.com/atom/node-keytar) | OS 钥匙串 | MIT |
+| [dotenv](https://github.com/motdotla/dotenv) | .env 加载 | BSD-2-Clause |
+| [yaml](https://github.com/eemeli/yaml) | YAML 解析 | ISC |
+| [typescript](https://github.com/microsoft/TypeScript) | 编译器 | Apache-2.0 |
+| [vitest](https://github.com/vitest-dev/vitest) | 测试框架 | MIT |
+| [tsx](https://github.com/privatenumber/tsx) | TS 执行器 | MIT |
+| [vite](https://github.com/vitejs/vite) | 前端构建 | MIT |
+| [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react) | React 插件 | MIT |
+| [react](https://github.com/facebook/react) | 前端框架 | MIT |
+| [react-dom](https://github.com/facebook/react) | React DOM | MIT |
+
+所有依赖均为宽松许可证（MIT / BSD / ISC / Apache），可安全使用和分发。
