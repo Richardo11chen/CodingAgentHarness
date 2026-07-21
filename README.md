@@ -33,6 +33,8 @@ npm ci
 ### 从 npm 安装
 ```bash
 npm install -g coding-agent-harness
+# 卸载
+npm uninstall -g coding-agent-harness
 ```
 
 ### 从 Docker 安装
