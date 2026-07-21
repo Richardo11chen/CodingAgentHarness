@@ -53,12 +53,25 @@ npm run dev
 npm run dev:web
 ```
 
+### npm 全局安装后运行（任意目录）
+```bash
+# 安装（在项目根目录执行一次）
+npm install -g .
+
+# 然后在任意目录启动，agent 以当前目录为工作区
+cd /any/directory
+coding-agent-harness
+
+# 卸载
+npm uninstall -g coding-agent-harness
+```
+
 ### Docker 运行
 ```bash
 docker build -t coding-agent-harness .
 docker run -p 3000:3000 \
   -e OPENAI_API_KEY=your-api-key \
-  -v $(pwd)/workspace:/workspace \
+  -v $(pwd):/workspace \
   coding-agent-harness
 ```
 访问 http://localhost:3000
