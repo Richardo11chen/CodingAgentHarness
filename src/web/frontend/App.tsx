@@ -116,12 +116,15 @@ export function App() {
   }, [persistMsgs])
 
   return (
-    <div style={{
-      display: "flex", height: "100vh", background: theme.bg.marketing,
-      fontFamily: theme.font.family, fontFeatureSettings: theme.font.features,
-    }}>
+      <div style={{
+        display: "flex", height: "100vh", background: theme.bg.marketing,
+        fontFamily: theme.font.family, fontFeatureSettings: theme.font.features,
+        flexDirection: "column",
+      }}>
+      <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
       <ChatPanel onSend={handleSend} messages={messages} onClear={handleClear} />
       <MonitorPanel events={events} />
+      </div>
       <ApprovalModal
         action={pendingApproval?.action ?? null}
         policy={pendingApproval?.policy ?? null}
@@ -130,7 +133,7 @@ export function App() {
       />
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       <div style={{
-        position: "fixed", bottom: 0, left: 0, right: 0, padding: "6px 16px",
+        padding: "6px 16px", flexShrink: 0,
         background: theme.bg.panel, borderTop: `1px solid ${theme.border.subtle}`,
         fontSize: "12px", display: "flex", justifyContent: "space-between", alignItems: "center",
         color: theme.text.tertiary,

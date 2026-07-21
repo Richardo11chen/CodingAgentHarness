@@ -17,6 +17,7 @@ import type { Tool } from "../core/tools/file.js"
 import { KeychainStore, type CredentialStore } from "../credentials/keychain.js"
 import { EnvStore } from "../credentials/env.js"
 import { dirname, join } from "node:path"
+import { mkdirSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -59,6 +60,8 @@ export async function createHarnessServer(deps: ServerDeps): Promise<{ server: i
   // Sessions
   app.post("/api/sessions", (_req, res) => {
     const id = `session-${Date.now()}`
+    const workspaceDir = join(deps.projectDir, "workspaces", id)
+    mkdirSync(workspaceDir, { recursive: true })
     const tracer = new Tracer(500, (event) => {
       wss.clients.forEach((client) => {
         if (client.readyState === 1) client.send(JSON.stringify(event))
@@ -70,9 +73,9 @@ export async function createHarnessServer(deps: ServerDeps): Promise<{ server: i
       config: deps.config,
       policyEngine: PolicyEngine.fromYaml(deps.config.policies),
       hitl,
-      sandbox: new Sandbox(deps.projectDir, deps.config.sandbox),
+      sandbox: new Sandbox(workspaceDir, deps.config.sandbox),
       feedback: new FeedbackValidator(deps.config.sensors),
-      memory: new MemoryStore(join(deps.projectDir, ".harness", "memory.json")),
+      memory: new MemoryStore(join(workspaceDir, "memory.json")),
       tracer,
       tools: { file_read: fileRead, file_write: fileWrite, file_delete: fileDelete, shell_exec: shellExec, run_test: runTest } as Record<string, Tool>,
     })
