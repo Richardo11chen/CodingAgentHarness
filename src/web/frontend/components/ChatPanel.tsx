@@ -1,4 +1,5 @@
 import { useState } from "react"
+import ReactMarkdown from "react-markdown"
 import { theme } from "../theme"
 
 interface ChatPanelProps {
@@ -46,14 +47,41 @@ export function ChatPanel({ onSend, messages, onClear }: ChatPanelProps) {
             marginBottom: "12px", display: "flex",
             justifyContent: m.role === "user" ? "flex-end" : "flex-start",
           }}>
-            <span style={{
+            <div style={{
               maxWidth: "80%", padding: "8px 14px",
               borderRadius: m.role === "user" ? `${theme.radius.standard} ${theme.radius.standard} 2px ${theme.radius.standard}` : `${theme.radius.standard} ${theme.radius.standard} ${theme.radius.standard} 2px`,
               background: m.role === "user" ? theme.brand.indigo : theme.bg.translucentActive,
               color: m.role === "user" ? "#fff" : theme.text.primary,
-              fontSize: "14px", lineHeight: 1.5,
+              fontSize: "14px", lineHeight: 1.6,
               border: m.role === "user" ? "none" : `1px solid ${theme.border.standard}`,
-            }}>{m.content}</span>
+            }}>
+              {m.role === "user" ? m.content : (
+                <ReactMarkdown components={{
+                  code: ({ node, ...props }: any) => props?.inline ? (
+                    <code style={{
+                      background: "rgba(255,255,255,0.1)", padding: "1px 4px",
+                      borderRadius: "3px", fontSize: "13px", fontFamily: theme.font.mono,
+                    }}>{props.children}</code>
+                  ) : (
+                    <pre style={{
+                      background: "rgba(0,0,0,0.3)", padding: "10px 12px",
+                      borderRadius: theme.radius.standard, overflowX: "auto",
+                      margin: "8px 0",
+                    }}>
+                      <code style={{ fontFamily: theme.font.mono, fontSize: "13px", color: theme.text.secondary }}>{props.children}</code>
+                    </pre>
+                  ),
+                  p: ({ children }) => <p style={{ margin: "4px 0" }}>{children}</p>,
+                  ul: ({ children }) => <ul style={{ margin: "4px 0", paddingLeft: "20px" }}>{children}</ul>,
+                  ol: ({ children }) => <ol style={{ margin: "4px 0", paddingLeft: "20px" }}>{children}</ol>,
+                  h1: ({ children }) => <h1 style={{ fontSize: "18px", fontWeight: 590, margin: "8px 0 4px" }}>{children}</h1>,
+                  h2: ({ children }) => <h2 style={{ fontSize: "16px", fontWeight: 590, margin: "8px 0 4px" }}>{children}</h2>,
+                  h3: ({ children }) => <h3 style={{ fontSize: "15px", fontWeight: 590, margin: "6px 0 4px" }}>{children}</h3>,
+                  a: ({ href, children }) => <a href={href} style={{ color: theme.brand.violet, textDecoration: "none" }}>{children}</a>,
+                  blockquote: ({ children }) => <blockquote style={{ borderLeft: `2px solid ${theme.border.standard}`, margin: "4px 0", paddingLeft: "12px", color: theme.text.tertiary }}>{children}</blockquote>,
+                }}>{m.content}</ReactMarkdown>
+              )}
+            </div>
           </div>
         ))}
       </div>

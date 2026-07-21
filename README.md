@@ -83,6 +83,8 @@ docker run -p 3000:3000 \
 4. 设置环境变量 `OPENAI_API_KEY`
 5. 部署后获取公网 URL
 
+**已部署公网地址**：https://codingagentharness-t30h.onrender.com
+
 ## 分发命令
 
 | 形态 | 命令 |

@@ -7,3 +7,4 @@ dist/
 .harness/memory.json
 *.log
 .DS_Store
+workspaces/

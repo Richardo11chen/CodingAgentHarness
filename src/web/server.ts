@@ -60,7 +60,7 @@ export async function createHarnessServer(deps: ServerDeps): Promise<{ server: i
   // Sessions
   app.post("/api/sessions", (_req, res) => {
     const id = `session-${Date.now()}`
-    const workspaceDir = join(deps.projectDir, "workspaces", id)
+    const workspaceDir = join("/tmp", "harness-workspaces", id)
     mkdirSync(workspaceDir, { recursive: true })
     const tracer = new Tracer(500, (event) => {
       wss.clients.forEach((client) => {
