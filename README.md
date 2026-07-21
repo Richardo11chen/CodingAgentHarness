@@ -191,9 +191,39 @@ npx vitest run tests/demo/
 ```
 
 ### 机制演示（§A.6）
-1. **治理护栏拦截**：`tests/demo/guardrail-demo.test.ts` — agent 尝试 `rm -rf /`，被 Policy Engine 拦截
-2. **反馈闭环修正**：`tests/demo/feedback-demo.test.ts` — agent 写入错误代码，传感器反馈失败，agent 据此修正
-3. **HITL 审批流程**：`tests/demo/hitl-demo.test.ts` — agent 请求审批，暂停等待人工确认后恢复
+
+harness 核心机制必须用 mock/stub LLM 驱动的确定性单元测试验证，不依赖网络与真实 LLM。以下三个演示在 MockLLMProvider 下确定性地复现关键行为：
+
+**① 治理护栏拦截危险动作** — `tests/demo/guardrail-demo.test.ts`
+
+MockLLMProvider 被编程为尝试执行 `rm -rf /`（递归删除根目录）。Policy Engine 的 `command_pattern` 规则匹配到该危险命令，返回 `decision: deny`，agent 主循环收到拦截信号并跳过该动作。测试断言 `tracer.getDenials()` 长度为 1，证明护栏在代码层面（非提示词）拦截了危险操作。
+
+```bash
+npx vitest run tests/demo/guardrail-demo.test.ts
+```
+
+**② 反馈闭环驱动修正** — `tests/demo/feedback-demo.test.ts`
+
+MockLLMProvider 被编程为：第一步写入错误代码（`changedCode: true`），触发传感器运行测试命令。传感器返回失败结果（`exit code 1`），FeedbackValidator 解析输出并生成 `FeedbackReport`（`passed: false`），回灌到 agent 上下文。第二步 agent 据此反馈修正代码。测试断言 `tracer.getFeedbackReports()` 至少 1 条，且 agent 最终完成 3 步（写错→反馈→修正）。
+
+```bash
+npx vitest run tests/demo/feedback-demo.test.ts
+```
+
+**③ HITL 审批流程（重点维度）** — `tests/demo/hitl-demo.test.ts`
+
+重点维度为治理/护栏。MockLLMProvider 被编程为执行一个标记为 `ask` 的危险动作（如 `git push --force`）。Policy Engine 返回 `decision: ask`，HITL 状态机暂停 agent 主循环，等待人工审批。测试模拟审批通过后，agent 恢复执行并完成。测试断言 agent 在审批前暂停（`hitl.getState() === pending`），审批后恢复（`hitl.getState() === approved`），最终返回结果。
+
+```bash
+npx vitest run tests/demo/hitl-demo.test.ts
+```
+
+**运行全部演示：**
+```bash
+npx vitest run tests/demo/
+```
+
+所有演示使用 MockLLMProvider，不依赖网络和真实 LLM，每次运行结果确定且可复现。
 
 ## 技术栈
 
