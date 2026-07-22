@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import "dotenv/config"
 import { createHarnessServer } from "./web/server.js"
 import { createInterface } from "node:readline"
