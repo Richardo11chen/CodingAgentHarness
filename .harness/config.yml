@@ -1,20 +1,41 @@
 llm:
-  provider: "openai-compatible"
-  model: "glm-5.2"
-  baseURL: "https://njusehub.info/v1"
+  provider: deepseek-flash
+  model: deepseek-v4-flash
+  baseURL: https://api.deepseek.com
+  thinking: false
+  reasoning_effort: high
 tools:
   - file_read
   - file_write
   - file_delete
   - shell_exec
   - run_test
-policies: ".harness/policies.yml"
+policies: .harness/policies.yml
 sensors:
-  test: "npm test"
-  lint: "npx eslint src/"
-  typecheck: "npx tsc --noEmit"
+  test: npm test
+  lint: npx eslint src/
+  typecheck: npx tsc --noEmit
 sandbox:
   timeout: 30
   maxMemory: 512
 maxSteps: 50
 timeout: 300
+providers:
+  - key: openai
+    name: OpenAI 兼容 (GLM)
+    baseURL: https://njusehub.info/v1
+    model: glm-5.2
+    thinking: false
+    reasoning_effort: high
+  - key: deepseek-v4
+    name: DeepSeek V4 Pro
+    baseURL: https://api.deepseek.com
+    model: deepseek-v4-pro
+    thinking: true
+    reasoning_effort: high
+  - key: deepseek-flash
+    name: DeepSeek V4 Flash
+    baseURL: https://api.deepseek.com
+    model: deepseek-v4-flash
+    thinking: false
+    reasoning_effort: high

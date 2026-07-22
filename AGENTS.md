@@ -41,7 +41,7 @@ src/
 - **HITL 审批流程**: 服务端在 `HitlStateMachine` 中存储 promise resolver。前端调用 `POST /api/sessions/:id/approve`，走 HTTP 而非 WebSocket。
 - **事件广播**: `Tracer` 通过回调广播事件。WebSocket 连接通过 URL query `?sessionId=xxx` 与会话关联，`done`/`error` 事件仅发给匹配的客户端（无 sessionId 的旧客户端作为兜底）。
 - **LLM 引用共享**: 所有会话共享同一个 `deps.llm` 对象。`rebuildLLM()` 全局替换它，优先从 credentialStore 读取，回退到 `process.env.OPENAI_API_KEY`。配置变更前创建的会话仍使用旧引用，直到调用 `run()`（此时读取当前 `deps.llm`）。
-- **沙箱工作目录**: 每个会话独享 `/tmp/harness-workspaces/session-<时间戳>/`，sandbox.ts 将相对路径 resolve 为 workspace 下的绝对路径后再传给工具函数。通过 `DELETE /api/sessions/:id` 可清理会话及其 workspace。
+- **沙箱工作目录**: 每个会话使用项目根目录作为工作区。sandbox.ts 将相对路径 resolve 为项目目录下的绝对路径。通过 `DELETE /api/sessions/:id` 可清理会话（不会删除项目文件）。
 - **WebSocket 认证**: 服务端启动时生成随机 token（`GET /api/auth-token`），WS 连接需携带 `?token=xxx` 参数。
 - **API key 回退**: `process.env.OPENAI_API_KEY` → keytar（OS 钥匙串）→ `.harness/.env` 文件。`rebuildLLM()` 先查 credentialStore，再回退到环境变量。
 - **无 linter/formatter**: 项目没有 eslint、prettier 或 husky 配置。

@@ -205,4 +205,37 @@ describe("Harness agent loop", () => {
     const result = await harness2.run("second task")
     expect(result.answer).toBe("Done2")
   })
+
+  it("stops after 3 consecutive governance denies", async () => {
+    const denyPolicies: Policy[] = [
+      { name: "block-read", type: "command_pattern", pattern: "cat\\s+/etc/passwd", decision: "deny", message: "blocked" },
+    ]
+    const config: Config = {
+      llm: { provider: "mock", model: "mock", baseURL: "" },
+      tools: ["shell_exec"], policies: "",
+      sensors: { test: "", lint: "", typecheck: "" },
+      sandbox: { timeout: 30, maxMemory: 512 }, maxSteps: 50, timeout: 300,
+    }
+    const responses = [
+      { text: "trying 1", action: { type: "call_tool", tool: "shell_exec", args: { command: "cat /etc/passwd" } } },
+      { text: "trying 2", action: { type: "call_tool", tool: "shell_exec", args: { command: "cat /etc/passwd" } } },
+      { text: "trying 3", action: { type: "call_tool", tool: "shell_exec", args: { command: "cat /etc/passwd" } } },
+      { text: "should not reach", action: { type: "done" } },
+    ]
+    const harness = new Harness({
+      llm: new MockLLMProvider(responses),
+      config,
+      policyEngine: new PolicyEngine(denyPolicies),
+      hitl: new HitlStateMachine(),
+      sandbox: new Sandbox(dir, { timeout: 30, maxMemory: 512 }),
+      feedback: new FeedbackValidator(config.sensors),
+      memory: new MemoryStore(join(dir, "mem.json")),
+      tracer: new Tracer(),
+      tools: { file_read: fileRead, file_write: fileWrite, file_delete: fileWrite, shell_exec: shellExec, run_test: runTest } as any,
+    })
+    const result = await harness.run("read passwd")
+    expect(result.steps).toBe(3)
+    expect(result.answer).toContain("Security")
+    expect(harness.tracer.getDenials()).toHaveLength(3)
+  })
 })

@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest"
-import { createServer } from "node:http"
 import { createHarnessServer } from "../../src/web/server"
 import { MockLLMProvider } from "../../src/core/llm"
 import type { Server } from "node:http"
+import { mkdtempSync, rmSync, mkdirSync } from "node:fs"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
 
 vi.mock("keytar", () => {
   const store = new Map<string, string>()
@@ -25,8 +27,11 @@ vi.mock("keytar", () => {
 describe("WebUI Server", () => {
   let server: Server
   let port: number
+  let tmpDir: string
 
   beforeAll(async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), "harness-test-"))
+    mkdirSync(join(tmpDir, ".harness"), { recursive: true })
     const result = await createHarnessServer({
       llm: new MockLLMProvider([{ text: "Done", action: { type: "done" } }]),
       config: {
@@ -34,13 +39,16 @@ describe("WebUI Server", () => {
         tools: [], policies: "", sensors: { test: "", lint: "", typecheck: "" },
         sandbox: { timeout: 30, maxMemory: 512 }, maxSteps: 50, timeout: 300,
       },
-      projectDir: process.cwd(),
+      projectDir: tmpDir,
     })
     server = result.server
     port = result.port
   })
 
-  afterAll(() => server.close())
+  afterAll(() => {
+    server.close()
+    rmSync(tmpDir, { recursive: true, force: true })
+  })
 
   it("GET /api/health returns ok", async () => {
     const res = await fetch(`http://localhost:${port}/api/health`)

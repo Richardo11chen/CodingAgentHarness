@@ -5,11 +5,15 @@ import type { Tool } from "./file.js"
 export const shellExec: Tool = async (args) => {
   try {
     if (!args.command) return { success: false, error: "command required" }
-    const stdout = execSync(args.command, {
+    const opts: any = {
       timeout: 30000,
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
-    })
+    }
+    if (args.cwd) {
+      opts.cwd = args.cwd
+    }
+    const stdout = execSync(args.command, opts)
     return { success: true, stdout, stderr: "", exitCode: 0 }
   } catch (e: any) {
     if (e.signal === "SIGTERM") {

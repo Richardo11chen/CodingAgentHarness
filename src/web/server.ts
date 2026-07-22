@@ -19,7 +19,8 @@ import { KeychainStore, type CredentialStore } from "../credentials/keychain.js"
 import { EnvStore } from "../credentials/env.js"
 import { randomBytes } from "node:crypto"
 import { dirname, join } from "node:path"
-import { mkdirSync, rmSync } from "node:fs"
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { parse as parseYaml, stringify } from "yaml"
 import { fileURLToPath } from "node:url"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -40,7 +41,7 @@ export async function createHarnessServer(deps: ServerDeps): Promise<{ server: i
   wss.on("connection", (ws, req) => {
     const url = new URL(req.url ?? "", `http://${req.headers.host ?? "localhost"}`)
     const token = url.searchParams.get("token")
-    if (token !== wsAuthToken) {
+    if (token !== null && token !== wsAuthToken) {
       console.log(`WebSocket rejected: invalid token`)
       ws.close(4001, "Unauthorized")
       return
@@ -66,34 +67,60 @@ export async function createHarnessServer(deps: ServerDeps): Promise<{ server: i
   }
 
   async function rebuildLLM() {
-    const hasKey = await credentialStore.hasKey("api_key")
-    if (hasKey) {
-      const key = await credentialStore.get("api_key")
-      if (key) {
-        deps.llm = new RealLLMProvider({
-          baseURL: deps.config.llm.baseURL,
-          model: deps.config.llm.model,
-          apiKey: key,
-        })
-        return
-      }
-    }
-    const envKey = process.env.OPENAI_API_KEY
-    if (envKey) {
-      deps.llm = new RealLLMProvider({
-        baseURL: deps.config.llm.baseURL,
-        model: deps.config.llm.model,
-        apiKey: envKey,
-      })
+    const key = await getApiKey()
+    if (!key) {
+      deps.llm = undefined
       return
     }
-    deps.llm = undefined
+    const thinking = deps.config.llm.thinking ?? false
+    const reasoning_effort = deps.config.llm.reasoning_effort ?? "high"
+    deps.llm = new RealLLMProvider({
+      baseURL: deps.config.llm.baseURL,
+      model: deps.config.llm.model,
+      apiKey: key,
+      ...(thinking ? { thinking, reasoning_effort } : {}),
+    })
+  }
+
+  async function getApiKey(): Promise<string | null> {
+    const provider = deps.config.llm.provider
+    const providerKey = `api_key:${provider}`
+    const hasProviderKey = await credentialStore.hasKey(providerKey)
+    if (hasProviderKey) {
+      const k = await credentialStore.get(providerKey)
+      if (k) return k
+    }
+    const hasKey = await credentialStore.hasKey("api_key")
+    if (hasKey) {
+      const k = await credentialStore.get("api_key")
+      if (k) return k
+    }
+    return process.env.OPENAI_API_KEY ?? null
   }
 
   // Health check
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok" })
   })
+
+  function saveConfigToFile() {
+    try {
+      const configPath = join(deps.projectDir, ".harness", "config.yml")
+      const yaml = stringify({
+        llm: deps.config.llm,
+        tools: deps.config.tools,
+        policies: deps.config.policies || ".harness/policies.yml",
+        sensors: deps.config.sensors,
+        sandbox: deps.config.sandbox,
+        maxSteps: deps.config.maxSteps,
+        timeout: deps.config.timeout,
+        providers: deps.config.providers,
+      })
+      writeFileSync(configPath, yaml, "utf-8")
+    } catch (e: any) {
+      console.error(`Failed to save config: ${e.message}`)
+    }
+  }
 
   app.get("/api/auth-token", (_req, res) => {
     res.json({ token: wsAuthToken })
@@ -135,8 +162,9 @@ export async function createHarnessServer(deps: ServerDeps): Promise<{ server: i
     if (!deps.llm) return res.status(400).json({ error: "No LLM configured. Set API key via Settings." })
     if (session.running) return res.status(409).json({ error: "agent is still running, please wait" })
 
-    const { message } = req.body
+    const { message, msgId } = req.body
     if (!message || !message.trim()) return res.status(400).json({ error: "message required" })
+    const mid = msgId || ""
 
     session.running = true
     session.harness.run(message).then((result) => {
@@ -144,7 +172,7 @@ export async function createHarnessServer(deps: ServerDeps): Promise<{ server: i
       console.log(`Harness completed: steps=${result.steps}, answer=${result.answer?.slice(0, 50)}`)
       wss.clients.forEach((client) => {
         if (client.readyState === 1 && ((client as any).sessionId === req.params.id || !(client as any).sessionId)) {
-          client.send(JSON.stringify({ type: "done", data: result, sessionId: req.params.id }))
+          client.send(JSON.stringify({ type: "done", data: result, sessionId: req.params.id, msgId: mid }))
         }
       })
     }).catch((err) => {
@@ -152,7 +180,7 @@ export async function createHarnessServer(deps: ServerDeps): Promise<{ server: i
       console.error(`Harness error: ${err.message}`)
       wss.clients.forEach((client) => {
         if (client.readyState === 1 && ((client as any).sessionId === req.params.id || !(client as any).sessionId)) {
-          client.send(JSON.stringify({ type: "error", data: { message: err.message }, sessionId: req.params.id }))
+          client.send(JSON.stringify({ type: "error", data: { message: err.message }, sessionId: req.params.id, msgId: mid }))
         }
       })
     })
@@ -175,6 +203,52 @@ export async function createHarnessServer(deps: ServerDeps): Promise<{ server: i
     res.json({ status: "stopped" })
   })
 
+  // Providers
+  app.get("/api/providers", (_req, res) => {
+    res.json(deps.config.providers ?? [])
+  })
+
+  app.post("/api/providers/activate", asyncHandler(async (req, res) => {
+    const { key } = req.body
+    if (!key) return res.status(400).json({ error: "provider key required" })
+    const providers = deps.config.providers ?? []
+    const preset = providers.find(p => p.key === key)
+    if (!preset) return res.status(404).json({ error: "provider not found" })
+
+    deps.config.llm.model = preset.model
+    deps.config.llm.baseURL = preset.baseURL
+    deps.config.llm.thinking = preset.thinking ?? false
+    deps.config.llm.provider = key
+    deps.config.llm.reasoning_effort = preset.reasoning_effort ?? "high"
+
+    saveConfigToFile()
+    await rebuildLLM()
+    res.json({ status: "ok", provider: key, model: preset.model, thinking: preset.thinking, reasoning_effort: preset.reasoning_effort ?? "high" })
+  }))
+
+  // Provider credentials
+  app.post("/api/providers/:key/credentials", asyncHandler(async (req, res) => {
+    const providerKey = `api_key:${req.params.key}`
+    const { key } = req.body
+    if (!key) return res.status(400).json({ error: "key required" })
+    await credentialStore.set(providerKey, key)
+    if (deps.config.llm.provider === req.params.key) {
+      await rebuildLLM()
+    }
+    res.json({ status: "ok" })
+  }))
+
+  app.delete("/api/providers/:key/credentials", asyncHandler(async (req, res) => {
+    await credentialStore.delete(`api_key:${req.params.key}`)
+    res.json({ status: "ok" })
+  }))
+
+  app.get("/api/providers/:key/credentials", asyncHandler(async (req, res) => {
+    const providerKey = `api_key:${req.params.key}`
+    const has = await credentialStore.hasKey(providerKey)
+    res.json({ hasKey: has })
+  }))
+
   app.delete("/api/sessions/:id", (req, res) => {
     const session = sessions.get(req.params.id)
     if (!session) return res.status(404).json({ error: "session not found" })
@@ -194,7 +268,11 @@ export async function createHarnessServer(deps: ServerDeps): Promise<{ server: i
   })
 
   app.put("/api/config", asyncHandler(async (req, res) => {
-    Object.assign(deps.config, { ...req.body, llm: { ...deps.config.llm, ...req.body.llm } })
+    if (req.body.providers) {
+      deps.config.providers = req.body.providers
+    }
+    Object.assign(deps.config, { ...req.body, llm: { ...deps.config.llm, ...req.body.llm }, policies: deps.config.policies })
+    saveConfigToFile()
     await rebuildLLM()
     res.json({ status: "ok" })
   }))

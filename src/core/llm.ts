@@ -23,6 +23,8 @@ export interface RealLLMConfig {
   baseURL: string
   model: string
   apiKey: string
+  thinking?: boolean
+  reasoning_effort?: string
 }
 
 export class RealLLMProvider implements LLMProvider {
@@ -42,7 +44,7 @@ export class RealLLMProvider implements LLMProvider {
 
       if (m.role === "assistant" && m.action?.type === "call_tool") {
         const id = `call_${toolCallId++}`
-        result.push({
+        const msg: any = {
           role: "assistant",
           content: m.content || null,
           tool_calls: [{
@@ -53,7 +55,11 @@ export class RealLLMProvider implements LLMProvider {
               arguments: JSON.stringify(m.action.args ?? {}),
             },
           }],
-        })
+        }
+        if (m.reasoning_content !== undefined) {
+          msg.reasoning_content = m.reasoning_content
+        }
+        result.push(msg)
 
         if (i + 1 < messages.length && messages[i + 1].role === "user" && messages[i + 1].content.startsWith("Tool result:")) {
           i++
@@ -115,12 +121,17 @@ export class RealLLMProvider implements LLMProvider {
       },
     ]
 
-    const body = {
+    const body: Record<string, any> = {
       model: options?.model ?? this.config.model,
       messages: this.convertMessages(messages),
       tools,
       temperature: options?.temperature ?? 0.7,
       max_tokens: options?.maxTokens ?? 4096,
+    }
+
+    if (this.config.thinking) {
+      body.thinking = { type: "enabled" }
+      body.reasoning_effort = this.config.reasoning_effort || "high"
     }
 
     const controller = new AbortController()
@@ -144,16 +155,18 @@ export class RealLLMProvider implements LLMProvider {
       const data = await res.json()
       const message = data.choices[0].message
       const text = message.content || message.reasoning_content || ""
+      const reasoning_content = message.reasoning_content
       const toolCall = message.tool_calls?.[0]
 
       if (!toolCall) {
-        return { text, action: { type: "done", text } }
+        return { text, reasoning_content, action: { type: "done", text } }
       }
 
       let args: any = {}
       try { args = JSON.parse(toolCall.function.arguments) } catch {}
       return {
         text,
+        reasoning_content,
         action: {
           type: "call_tool",
           tool: toolCall.function.name,

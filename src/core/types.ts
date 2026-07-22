@@ -1,6 +1,7 @@
 export interface Message {
   role: "system" | "user" | "assistant"
   content: string
+  reasoning_content?: string
   action?: Action
 }
 
@@ -19,6 +20,7 @@ export interface ToolArgs {
   path?: string
   content?: string
   command?: string
+  cwd?: string
 }
 
 export interface ToolResult {
@@ -81,9 +83,10 @@ export interface AgentResult {
 }
 
 export interface Config {
-  llm: { provider: string; model: string; baseURL: string }
+  llm: { provider: string; model: string; baseURL: string; thinking?: boolean; reasoning_effort?: string }
   tools: string[]
   policies: string
+  providers?: ProviderPreset[]
   sensors: { test: string; lint: string; typecheck: string }
   sandbox: { timeout: number; maxMemory: number }
   maxSteps: number
@@ -92,6 +95,7 @@ export interface Config {
 
 export interface LLMResponse {
   text: string
+  reasoning_content?: string
   action: Action
 }
 
@@ -99,4 +103,14 @@ export interface LLMOptions {
   model?: string
   temperature?: number
   maxTokens?: number
+}
+
+export interface ProviderPreset {
+  key: string
+  name: string
+  baseURL: string
+  model: string
+  thinking?: boolean
+  reasoning_effort?: string
+  apiKey?: string
 }

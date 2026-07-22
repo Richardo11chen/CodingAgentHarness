@@ -4,7 +4,9 @@ docs/通用要求.md
 node_modules/
 dist/
 .env
+.harness/.env
 .harness/memory.json
+.harness/memory/
 *.log
 .DS_Store
 workspaces/

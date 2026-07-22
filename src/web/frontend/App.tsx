@@ -19,7 +19,6 @@ interface Conversation {
 }
 
 export function App() {
-  const { events, connected } = useWebSocket()
   const [conversations, setConversations] = useState<Conversation[]>(() => {
     try { return JSON.parse(localStorage.getItem(CONV_KEY) ?? "[]") } catch { return [] }
   })
@@ -29,9 +28,8 @@ export function App() {
   const [hasKey, setHasKey] = useState<boolean | null>(null)
   const [runningConvId, setRunningConvId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const seenDone = useRef(0)
-  const seenErr = useRef(0)
-  const pendingReply = useRef<{ convId: string; sessionId: string } | null>(null)
+  const doneIdxRef = useRef(0)
+  const pendingReply = useRef<{ convId: string; sessionId: string; msgId: string } | null>(null)
   const runTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
   const seenApproval = useRef(0)
 
@@ -44,8 +42,7 @@ export function App() {
 
   useEffect(() => {
     const stored = JSON.parse(sessionStorage.getItem("harness_events") ?? "[]")
-    seenDone.current = stored.filter((e: any) => e.type === "done" && e.data?.steps !== undefined).length
-    seenErr.current = stored.filter((e: any) => e.type === "error").length
+    seenApproval.current = stored.filter((e: any) => e.type === "approval_request").length
   }, [])
 
   useEffect(() => {
@@ -70,6 +67,34 @@ export function App() {
     })
   }, [persistConvs])
 
+  const handleDone = useCallback((ev: any) => {
+    const pr = pendingReply.current
+    if (!pr || ev.msgId !== pr.msgId) return
+    const answer = ev.data?.answer || "Task completed."
+    updateConv(pr.convId, c => ({
+      ...c,
+      messages: [...c.messages, { role: "assistant", content: answer }],
+    }))
+    setRunningConvId(null)
+    pendingReply.current = null
+    if (runTimeoutRef.current) { clearTimeout(runTimeoutRef.current); runTimeoutRef.current = undefined }
+  }, [updateConv])
+
+  const handleError = useCallback((ev: any) => {
+    const pr = pendingReply.current
+    if (!pr || ev.msgId !== pr.msgId) return
+    const msg = ev.data?.message ?? "Unknown error"
+    updateConv(pr.convId, c => ({
+      ...c,
+      messages: [...c.messages, { role: "assistant", content: `Error: ${msg}` }],
+    }))
+    setRunningConvId(null)
+    pendingReply.current = null
+    if (runTimeoutRef.current) { clearTimeout(runTimeoutRef.current); runTimeoutRef.current = undefined }
+  }, [updateConv])
+
+  const { events, connected } = useWebSocket(handleDone, handleError)
+
   const handleNew = useCallback(() => {
     const id = `conv-${Date.now()}`
     const conv: Conversation = { id, sessionId: null, title: "", messages: [], createdAt: Date.now() }
@@ -87,10 +112,36 @@ export function App() {
     localStorage.setItem(ACTIVE_KEY, id)
   }, [])
 
-  const handleSend = useCallback(async (message: string) => {
-    if (running || !activeConv) return
+  const handleDelete = useCallback((id: string) => {
+    setConversations(prev => {
+      const next = prev.filter(c => c.id !== id)
+      persistConvs(next)
+      if (activeId === id) {
+        const newActive = next.length > 0 ? next[0].id : null
+        setActiveId(newActive)
+        if (newActive) localStorage.setItem(ACTIVE_KEY, newActive)
+        else localStorage.removeItem(ACTIVE_KEY)
+      }
+      return next
+    })
+  }, [activeId, persistConvs])
 
-    const convId = activeConv.id
+  const handleSend = useCallback(async (message: string) => {
+    let conv = activeConv
+    if (!conv) {
+      const id = `conv-${Date.now()}`
+      conv = { id, sessionId: null, title: "", messages: [], createdAt: Date.now() }
+      setConversations(prev => {
+        const next = [conv!, ...prev]
+        persistConvs(next)
+        return next
+      })
+      setActiveId(id)
+      localStorage.setItem(ACTIVE_KEY, id)
+    }
+    if (running) return
+
+    const convId = conv!.id
     const userMsg = { role: "user", content: message }
     updateConv(convId, c => ({
       ...c,
@@ -99,7 +150,7 @@ export function App() {
     }))
     setRunningConvId(convId)
 
-    let sid = activeConv.sessionId
+    let sid = conv!.sessionId
     try {
       if (!sid) {
         const res = await fetch("/api/sessions", { method: "POST" })
@@ -109,7 +160,8 @@ export function App() {
         updateConv(convId, c => ({ ...c, sessionId: sid! }))
       }
 
-      pendingReply.current = { convId, sessionId: sid! }
+      const msgId = `msg-${Date.now()}`
+      pendingReply.current = { convId, sessionId: sid!, msgId }
       if (runTimeoutRef.current) clearTimeout(runTimeoutRef.current)
       runTimeoutRef.current = setTimeout(() => {
         setRunningConvId(null)
@@ -120,7 +172,7 @@ export function App() {
       let res = await fetch(`/api/sessions/${sid}/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, msgId }),
       })
 
       if (res.status === 404) {
@@ -129,7 +181,7 @@ export function App() {
         const newData = await newRes.json()
         sid = newData.id
         updateConv(convId, c => ({ ...c, sessionId: sid! }))
-        pendingReply.current = { convId, sessionId: sid! }
+        pendingReply.current = { convId, sessionId: sid!, msgId }
         if (runTimeoutRef.current) clearTimeout(runTimeoutRef.current)
         runTimeoutRef.current = setTimeout(() => {
           setRunningConvId(null)
@@ -140,7 +192,7 @@ export function App() {
         res = await fetch(`/api/sessions/${sid}/message`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message }),
+          body: JSON.stringify({ message, msgId }),
         })
       }
 
@@ -164,39 +216,6 @@ export function App() {
       if (runTimeoutRef.current) { clearTimeout(runTimeoutRef.current); runTimeoutRef.current = undefined }
     }
   }, [activeConv, running, updateConv])
-
-  useEffect(() => {
-    const doneEvents = events.filter((e) => e.type === "done" && (e as any).data?.steps !== undefined)
-    if (doneEvents.length > seenDone.current) {
-      const newDones = doneEvents.slice(seenDone.current)
-      seenDone.current = doneEvents.length
-      for (const ev of newDones) {
-        const answer = (ev as any).data?.answer
-        const target = pendingReply.current
-        if (answer && target) {
-          updateConv(target.convId, c => ({ ...c, messages: [...c.messages, { role: "assistant", content: answer }] }))
-        }
-      }
-      setRunningConvId(null)
-      pendingReply.current = null
-      if (runTimeoutRef.current) { clearTimeout(runTimeoutRef.current); runTimeoutRef.current = undefined }
-    }
-    const errEvents = events.filter((e) => e.type === "error")
-    if (errEvents.length > seenErr.current) {
-      const newErrs = errEvents.slice(seenErr.current)
-      seenErr.current = errEvents.length
-      for (const ev of newErrs) {
-        const msg = (ev as any).data?.message ?? "Unknown error"
-        const target = pendingReply.current
-        if (target) {
-          updateConv(target.convId, c => ({ ...c, messages: [...c.messages, { role: "assistant", content: `Error: ${msg}` }] }))
-        }
-      }
-      setRunningConvId(null)
-      pendingReply.current = null
-      if (runTimeoutRef.current) { clearTimeout(runTimeoutRef.current); runTimeoutRef.current = undefined }
-    }
-  }, [events, updateConv])
 
   useEffect(() => {
     const approvalEvents = events.filter((e) => e.type === "approval_request")
@@ -249,6 +268,7 @@ export function App() {
           activeId={activeId}
           onSelect={handleSelect}
           onNew={handleNew}
+          onDelete={handleDelete}
           runningConvId={runningConvId}
         />
       )}

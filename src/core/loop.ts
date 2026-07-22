@@ -28,7 +28,7 @@ export class Harness {
 
   constructor(deps: HarnessDeps) {
     this.deps = deps
-    this.systemPrompt = "You are a coding agent. Use tools to accomplish the goal. Call 'done' when finished."
+    this.systemPrompt = "You are a coding agent. You are NOT Claude or ChatGPT. Use tools: file_read, file_write, file_delete, shell_exec, run_test. When done, output a summary and stop."
   }
 
   getConfig(): Config { return this.deps.config }
@@ -51,6 +51,8 @@ export class Harness {
 
     let steps = 0
     let answer: string | null = null
+    let consecutiveDenies = 0
+    const MAX_DENIES = 3
 
     while (steps < config.maxSteps && hitl.getState() !== AgentState.Stopped) {
       steps++
@@ -60,7 +62,17 @@ export class Harness {
       const response = await llm.complete(context, undefined, config.timeout * 1000)
       tracer.record({ type: "thinking", data: { text: response.text } })
 
-      context.push({ role: "assistant", content: response.text, action: response.action })
+      const assistantMsg: Message = { role: "assistant", content: response.text, action: response.action }
+      if (response.reasoning_content !== undefined) {
+        assistantMsg.reasoning_content = response.reasoning_content
+      }
+      context.push(assistantMsg)
+
+      if (response.action.type === "call_tool" && response.action.tool === "done") {
+        answer = response.text
+        tracer.record({ type: "done", data: { answer } })
+        break
+      }
 
       if (response.action.type === "done") {
         answer = response.text
@@ -80,20 +92,35 @@ export class Harness {
         tracer.record({ type: "governance", data: govResult })
 
         if (govResult.decision === "deny") {
-          context.push({ role: "user", content: `Tool result: Action denied - ${govResult.policy?.message ?? "policy violation"}` })
+          consecutiveDenies++
+          if (consecutiveDenies >= MAX_DENIES) {
+            answer = "Security: Too many denied actions. Stopping."
+            tracer.record({ type: "done", data: { answer } })
+            break
+          }
+          context.push({ role: "user", content: `Tool result: Action denied - ${govResult.policy?.message ?? "policy violation"}. Do NOT retry or find alternatives; this operation is not allowed.` })
           continue
         }
+
+        consecutiveDenies = 0
 
         if (govResult.decision === "ask") {
           hitl.requestApproval(response.action)
           tracer.record({ type: "approval_request", data: { action: response.action, policy: govResult.policy } })
           const approvedAction = await hitl.waitForApproval()
           if (approvedAction) {
+            consecutiveDenies = 0
             const result = await sandbox.run(tools[approvedAction.tool ?? ""], approvedAction.args ?? {})
             tracer.record({ type: "tool_result", data: result })
             context.push({ role: "user", content: `Tool result: ${JSON.stringify(result)}` })
           } else {
-            context.push({ role: "user", content: `Tool result: Action denied - ${govResult.policy?.message ?? ""}` })
+            consecutiveDenies++
+            if (consecutiveDenies >= MAX_DENIES) {
+              answer = "Security: Too many denied actions. Stopping."
+              tracer.record({ type: "done", data: { answer } })
+              break
+            }
+            context.push({ role: "user", content: `Tool result: Action denied - ${govResult.policy?.message ?? ""}. Do NOT retry or find alternatives; this operation is not allowed.` })
           }
           continue
         }
@@ -102,11 +129,12 @@ export class Harness {
         tracer.record({ type: "tool_start", data: { tool: response.action.tool, args: response.action.args } })
         const tool = tools[response.action.tool ?? ""]
         if (!tool) {
-          context.push({ role: "user", content: `Tool not found: ${response.action.tool}` })
+          context.push({ role: "user", content: `Tool result: unknown tool "${response.action.tool}"` })
           continue
         }
         const result = await sandbox.run(tool, response.action.args ?? {})
         tracer.record({ type: "tool_result", data: result })
+        context.push({ role: "user", content: `Tool result: ${JSON.stringify(result)}` })
 
         // Feedback if code changed
         if (response.action.changedCode) {
@@ -118,8 +146,6 @@ export class Harness {
             context.push({ role: "user", content: `Feedback: ${JSON.stringify(report)}` })
           }
         }
-
-        context.push({ role: "user", content: `Tool result: ${JSON.stringify(result)}` })
       }
     }
 

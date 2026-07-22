@@ -5,6 +5,36 @@ rules:
     decision: deny
     message: "禁止递归删除根目录"
 
+  - name: "no-kill-process"
+    type: command_pattern
+    pattern: '(kill|pkill|killall)\s+'
+    decision: deny
+    message: "禁止终止进程"
+
+  - name: "no-sudo"
+    type: command_pattern
+    pattern: '(sudo|su\s+-|chmod\s+777|chown|reboot|shutdown|halt|poweroff|systemctl|service\s+stop|service\s+restart)'
+    decision: deny
+    message: "禁止提权/系统管理命令"
+
+  - name: "no-process-list"
+    type: command_pattern
+    pattern: '(lsof|ss\s+|netstat|fuser|ps\s+|pgrep|pidof|/proc/|who\s+|w\s+|last|top|htop|nmap|tcpdump)'
+    decision: deny
+    message: "禁止查看系统和进程信息"
+
+  - name: "no-localhost-curl"
+    type: command_pattern
+    pattern: '(curl|wget)\s+.*(localhost|127\.0\.0\.1|::1)'
+    decision: deny
+    message: "禁止请求本地服务（防止自攻击）"
+
+  - name: "no-overwrite-redirect"
+    type: command_pattern
+    pattern: '>\s+(/etc|/proc|/sys|\.\./|~)'
+    decision: deny
+    message: "禁止重定向覆盖系统文件"
+
   - name: "force-push-approval"
     type: command_pattern
     pattern: 'git\s+push.*--force'
@@ -20,8 +50,14 @@ rules:
   - name: "env-file-protection"
     type: path_pattern
     pattern: "**/.env"
-    decision: ask
-    message: "修改 .env 文件需要确认"
+    decision: deny
+    message: "禁止读写 .env 文件"
+
+  - name: "env-cmd-protection"
+    type: command_pattern
+    pattern: '\.env'
+    decision: deny
+    message: "禁止通过命令操作 .env 文件"
 
   - name: "db-drop-protection"
     type: command_pattern

@@ -25,6 +25,9 @@ export class Sandbox {
       }
       resolvedArgs.path = resolved
     }
+    if (args.command && !args.cwd) {
+      resolvedArgs.cwd = this.projectDir
+    }
     return tool(resolvedArgs)
   }
 
