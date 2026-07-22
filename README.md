@@ -1,6 +1,8 @@
 # Coding Agent Harness
 
 > Agent = LLM + Harness. 本项目实现了一个面向 coding 场景的 agent harness 内核——当 LLM 负责"决定下一步做什么"时，harness 负责组织上下文、分发工具、治理护栏、反馈闭环、记忆与配置。
+>
+> **GitHub Release**: https://github.com/Richardo11chen/CodingAgentHarness/releases
 
 ## 项目简介
 
