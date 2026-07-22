@@ -46,6 +46,27 @@ npm run dev
 
 每个供应商可独立配置 API Key，切换时自动使用对应 Key。
 
+### 5. CLI 模式
+
+除 WebUI 外，也支持命令行直接使用：
+
+```bash
+# 一次性任务：直接在命令行传入 prompt
+npm run dev -- "帮我创建一个 hello.txt 文件"
+
+# 或全局安装后
+coding-agent-harness "创建一个 hello.txt 文件"
+
+# 指定模型
+coding-agent-harness -m deepseek-v4-pro "解释什么是递归"
+
+# 指定供应商
+coding-agent-harness --provider deepseek-v4 "帮我写一个排序函数"
+
+# 互动模式：直接在终端输入（无参数且 stdin 是 TTY 时自动启动）
+coding-agent-harness
+```
+
 ## Key 安全配置
 
 harness 支持三种 API Key 来源（按优先级）：
