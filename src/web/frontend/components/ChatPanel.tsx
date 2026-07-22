@@ -1,5 +1,6 @@
 import { useState } from "react"
 import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import { theme } from "../theme"
 
 interface ChatPanelProps {
@@ -11,6 +12,12 @@ interface ChatPanelProps {
 
 export function ChatPanel({ onSend, messages, onClear, running }: ChatPanelProps) {
   const [input, setInput] = useState("")
+
+  const fixMarkdown = (md: string) => {
+    return md
+      .replace(/\|\s+\|/g, (m) => m.includes("\n") ? m : m.replace(" |", "\n|"))
+      .replace(/\|\|/g, "|\n|")
+  }
 
   const handleSend = () => {
     if (input.trim()) {
@@ -57,7 +64,8 @@ export function ChatPanel({ onSend, messages, onClear, running }: ChatPanelProps
               border: m.role === "user" ? "none" : `1px solid ${theme.border.standard}`,
             }}>
               {m.role === "user" ? m.content : (
-                <ReactMarkdown components={{
+                <div className="markdown-body">
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
                   code: ({ node, ...props }: any) => props?.inline ? (
                     <code style={{
                       background: "rgba(255,255,255,0.1)", padding: "1px 4px",
@@ -72,15 +80,9 @@ export function ChatPanel({ onSend, messages, onClear, running }: ChatPanelProps
                       <code style={{ fontFamily: theme.font.mono, fontSize: "13px", color: theme.text.secondary }}>{props.children}</code>
                     </pre>
                   ),
-                  p: ({ children }) => <p style={{ margin: "4px 0" }}>{children}</p>,
-                  ul: ({ children }) => <ul style={{ margin: "4px 0", paddingLeft: "20px" }}>{children}</ul>,
-                  ol: ({ children }) => <ol style={{ margin: "4px 0", paddingLeft: "20px" }}>{children}</ol>,
-                  h1: ({ children }) => <h1 style={{ fontSize: "18px", fontWeight: 590, margin: "8px 0 4px" }}>{children}</h1>,
-                  h2: ({ children }) => <h2 style={{ fontSize: "16px", fontWeight: 590, margin: "8px 0 4px" }}>{children}</h2>,
-                  h3: ({ children }) => <h3 style={{ fontSize: "15px", fontWeight: 590, margin: "6px 0 4px" }}>{children}</h3>,
                   a: ({ href, children }) => <a href={href} style={{ color: theme.brand.violet, textDecoration: "none" }}>{children}</a>,
-                  blockquote: ({ children }) => <blockquote style={{ borderLeft: `2px solid ${theme.border.standard}`, margin: "4px 0", paddingLeft: "12px", color: theme.text.tertiary }}>{children}</blockquote>,
-                }}>{m.content}</ReactMarkdown>
+                }}>{fixMarkdown(m.content)}</ReactMarkdown>
+                </div>
               )}
             </div>
           </div>
