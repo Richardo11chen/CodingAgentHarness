@@ -133,7 +133,8 @@ export async function createHarnessServer(deps: ServerDeps): Promise<{ server: i
   // Sessions
   app.post("/api/sessions", (_req, res) => {
     const id = `session-${Date.now()}`
-    const workspaceDir = join("/tmp", "harness-workspaces", id)
+    const workspaceDir = deps.projectDir
+    mkdirSync(join(deps.projectDir, ".harness", "memory"), { recursive: true })
     mkdirSync(workspaceDir, { recursive: true })
     const tracer = new Tracer(500, (event) => {
       wss.clients.forEach((client) => {
@@ -148,7 +149,7 @@ export async function createHarnessServer(deps: ServerDeps): Promise<{ server: i
       hitl,
       sandbox: new Sandbox(workspaceDir, deps.config.sandbox),
       feedback: new FeedbackValidator(deps.config.sensors),
-      memory: new MemoryStore(join(workspaceDir, "memory.json")),
+      memory: new MemoryStore(join(deps.projectDir, ".harness", "memory", `${id}.json`)),
       tracer,
       tools: { file_read: fileRead, file_write: fileWrite, file_delete: fileDelete, shell_exec: shellExec, run_test: runTest } as Record<string, Tool>,
     })
@@ -253,11 +254,6 @@ export async function createHarnessServer(deps: ServerDeps): Promise<{ server: i
     const session = sessions.get(req.params.id)
     if (!session) return res.status(404).json({ error: "session not found" })
     session.hitl.stop()
-    try {
-      rmSync(session.workspaceDir, { recursive: true, force: true })
-    } catch (e: any) {
-      console.error(`Failed to clean workspace: ${e.message}`)
-    }
     sessions.delete(req.params.id)
     res.json({ status: "deleted" })
   })
