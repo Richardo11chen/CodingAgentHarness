@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import "dotenv/config"
 import { createHarnessServer } from "./web/server.js"
 import { DEFAULT_CONFIG, loadConfig } from "./core/config.js"
@@ -41,9 +42,11 @@ async function main() {
     : undefined as any
 
   const { port } = await createHarnessServer({ llm, config, projectDir: process.cwd() })
-  console.log(`Coding Agent Harness running on http://localhost:${port}`)
+  const url = `http://localhost:${port}`
+  console.log(`\n  🤖 Coding Agent Harness`)
+  console.log(`  WebUI: ${url}\n`)
   if (!apiKey) {
-    console.warn("WARNING: No API key found. Set OPENAI_API_KEY env var or configure via WebUI.")
+    console.warn("  WARNING: No API key found. Set OPENAI_API_KEY env var or configure via WebUI.\n")
   }
 }
 

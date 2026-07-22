@@ -8,7 +8,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "build": "tsc",
+    "build": "npx vite build && npx tsc -p tsconfig.build.json",
     "dev": "tsx src/index.ts",
     "dev:web": "vite"
   },
