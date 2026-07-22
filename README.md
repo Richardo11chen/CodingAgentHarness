@@ -25,7 +25,7 @@ git clone https://github.com/Richardo11chen/CodingAgentHarness.git
 cd CodingAgentHarness
 npm ci
 npm run build
-npm link
+npm link          # 只需一次，全局注册命令
 ```
 
 ### 2. 启动（任意目录）
@@ -43,7 +43,7 @@ WebUI: http://localhost:3000
 ```
 Ctrl+点击链接打开 WebUI。当前目录就是 agent 的工作区。
 
-> **开发模式**：`npm run dev` 用 tsx 直接启动，无需每次 build。
+> **修改代码后**：只需 `npm run build`，不需要重新 link。
 
 ### 3. 配置 API Key
 启动后右下角点「设置」→ 输入 API Key → 保存。支持三种配置方式：
