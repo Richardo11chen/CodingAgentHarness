@@ -8,9 +8,10 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "build": "tsc",
+    "build": "npx vite build && npx tsc -p tsconfig.build.json",
     "dev": "tsx src/index.ts",
-    "dev:web": "vite"
+    "dev:web": "vite",
+    "start": "node dist/index.js"
   },
   "dependencies": {
     "dotenv": "^16.4.0",
