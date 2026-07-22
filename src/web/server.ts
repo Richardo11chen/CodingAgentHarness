@@ -52,7 +52,7 @@ export async function createHarnessServer(deps: ServerDeps): Promise<{ server: i
     ws.on("close", () => console.log(`WebSocket client disconnected (session: ${(ws as any).sessionId ?? "none"})`))
   })
 
-  const sessions = new Map<string, { harness: Harness; hitl: HitlStateMachine; tracer: Tracer; running: boolean; workspaceDir: string }>()
+  const sessions = new Map<string, { harness: Harness; hitl: HitlStateMachine; tracer: Tracer; running: boolean; workspaceDir: string; context: any[] }>()
   const wsAuthToken = randomBytes(16).toString("hex")
   console.log(`WS Auth Token: ${wsAuthToken}`)
   const envStore = new EnvStore(join(deps.projectDir, ".harness", ".env"))
@@ -153,7 +153,7 @@ export async function createHarnessServer(deps: ServerDeps): Promise<{ server: i
       tracer,
       tools: { file_read: fileRead, file_write: fileWrite, file_delete: fileDelete, shell_exec: shellExec, run_test: runTest } as Record<string, Tool>,
     })
-    sessions.set(id, { harness, hitl, tracer, running: false, workspaceDir })
+    sessions.set(id, { harness, hitl, tracer, running: false, workspaceDir, context: [] })
     res.json({ id })
   })
 
@@ -168,8 +168,19 @@ export async function createHarnessServer(deps: ServerDeps): Promise<{ server: i
     const mid = msgId || ""
 
     session.running = true
-    session.harness.run(message).then((result) => {
+    const prevContext = session.context || []
+    session.harness.run(message, prevContext).then((result) => {
       session.running = false
+      // 更新上下文历史
+      session.context = [
+        ...prevContext,
+        { role: "user", content: message },
+        { role: "assistant", content: result.answer || "" },
+      ]
+      // 限制上下文长度，避免爆炸
+      if (session.context.length > 40) {
+        session.context = session.context.slice(-40)
+      }
       console.log(`Harness completed: steps=${result.steps}, answer=${result.answer?.slice(0, 50)}`)
       wss.clients.forEach((client) => {
         if (client.readyState === 1 && ((client as any).sessionId === req.params.id || !(client as any).sessionId)) {

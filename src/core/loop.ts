@@ -36,13 +36,18 @@ export class Harness {
   get tracer() { return this.deps.tracer }
   get hitl() { return this.deps.hitl }
 
-  async run(goal: string): Promise<AgentResult> {
+  async run(goal: string, existingContext?: Message[]): Promise<AgentResult> {
     const { llm, config, policyEngine, hitl, sandbox, feedback, memory, tracer, tools } = this.deps
 
-    let context: Message[] = [
-      { role: "system", content: this.systemPrompt },
-      { role: "user", content: goal },
-    ]
+    let context: Message[]
+    if (existingContext && existingContext.length > 0) {
+      context = [...existingContext, { role: "user", content: goal }]
+    } else {
+      context = [
+        { role: "system", content: this.systemPrompt },
+        { role: "user", content: goal },
+      ]
+    }
 
     const memResults = memory.read(goal)
     if (memResults.length > 0) {
