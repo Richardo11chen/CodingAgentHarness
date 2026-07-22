@@ -14,6 +14,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import type { Policy, Config } from "../../src/core/types"
+import { AgentState } from "../../src/core/types"
 
 const policies: Policy[] = [
   { name: "no-rm-rf", type: "command_pattern", pattern: "rm\\s+.*-r?f?.*/", decision: "deny", message: "no rm -rf" },
@@ -87,5 +88,121 @@ describe("Harness agent loop", () => {
     const result = await harness.run("loop forever")
     expect(result.steps).toBe(3)
     expect(result.answer).toBeNull()
+  })
+
+  it("handles take_note action and writes to memory", async () => {
+    const harness = buildTestHarness([
+      { text: "noted", action: { type: "take_note", note: "important info" } },
+      { text: "Done", action: { type: "done" } },
+    ], dir)
+    const result = await harness.run("take note")
+    expect(result.answer).toBe("Done")
+    expect(result.steps).toBe(2)
+  })
+
+  it("handles unknown tool gracefully", async () => {
+    const harness = buildTestHarness([
+      { text: "trying", action: { type: "call_tool", tool: "unknown_tool", args: {} } },
+      { text: "Done", action: { type: "done" } },
+    ], dir)
+    const result = await harness.run("use unknown tool")
+    expect(result.answer).toBe("Done")
+    expect(result.steps).toBe(2)
+  })
+
+  it("runs sensors when code changed", async () => {
+    const harness = buildTestHarness([
+      { text: "writing", action: { type: "call_tool", tool: "file_write", args: { path: join(dir, "x.ts"), content: "code" }, changedCode: true } },
+      { text: "Done", action: { type: "done" } },
+    ], dir)
+
+    const config = { ...harness.getConfig(), sensors: { test: "echo test-ok", lint: "", typecheck: "" } }
+    harness.setConfig(config)
+
+    const result = await harness.run("write code")
+    expect(result.answer).toBe("Done")
+    expect(result.steps).toBe(2)
+    const feedbackEvents = harness.tracer.export().filter(e => e.type === "feedback")
+    expect(feedbackEvents.length).toBeGreaterThan(0)
+  })
+
+  it("throws when LLM is undefined", async () => {
+    const deps = {
+      llm: undefined as any,
+      config: {
+        llm: { provider: "mock", model: "mock", baseURL: "" },
+        tools: [], policies: "", sensors: { test: "", lint: "", typecheck: "" },
+        sandbox: { timeout: 30, maxMemory: 512 }, maxSteps: 50, timeout: 300,
+      } as Config,
+      policyEngine: new PolicyEngine([]),
+      hitl: new HitlStateMachine(),
+      sandbox: new Sandbox(dir, { timeout: 30, maxMemory: 512 }),
+      feedback: new FeedbackValidator({ test: "", lint: "", typecheck: "" }),
+      memory: new MemoryStore(join(dir, "mem.json")),
+      tracer: new Tracer(),
+      tools: {} as Record<string, any>,
+    }
+    const harness = new Harness(deps)
+    await expect(harness.run("test")).rejects.toThrow("LLM provider not configured")
+  })
+
+  it("completes after HITL approval on ask decision", async () => {
+    const askPolicies: Policy[] = [
+      { name: "force-push", type: "command_pattern", pattern: "git\\s+push.*--force", decision: "ask", message: "需要确认" },
+    ]
+    const config: Config = {
+      llm: { provider: "mock", model: "mock", baseURL: "" },
+      tools: ["shell_exec"], policies: "",
+      sensors: { test: "", lint: "", typecheck: "" },
+      sandbox: { timeout: 30, maxMemory: 512 }, maxSteps: 50, timeout: 300,
+    }
+    const hitl = new HitlStateMachine()
+    const harness = new Harness({
+      llm: new MockLLMProvider([
+        { text: "pushing", action: { type: "call_tool", tool: "shell_exec", args: { command: "git push --force" } } },
+        { text: "Done", action: { type: "done" } },
+      ]),
+      config,
+      policyEngine: new PolicyEngine(askPolicies),
+      hitl,
+      sandbox: new Sandbox(dir, { timeout: 30, maxMemory: 512 }),
+      feedback: new FeedbackValidator(config.sensors),
+      memory: new MemoryStore(join(dir, "mem.json")),
+      tracer: new Tracer(),
+      tools: { file_read: fileRead, file_write: fileWrite, file_delete: fileWrite, shell_exec: shellExec, run_test: runTest } as any,
+    })
+
+    const runPromise = harness.run("push code")
+    await new Promise(r => setTimeout(r, 50))
+    expect(hitl.getState()).toBe(AgentState.PendingApproval)
+
+    hitl.approve()
+    const result = await runPromise
+    expect(result.answer).toBe("Done")
+    expect(result.steps).toBe(2)
+  })
+
+  it("injects memory into context on subsequent runs", async () => {
+    const harness = buildTestHarness([
+      { text: "Done1", action: { type: "done" } },
+    ], dir)
+    await harness.run("first task")
+
+    const mock2 = new MockLLMProvider([
+      { text: "Done2", action: { type: "done" } },
+    ])
+    const harness2 = new Harness({
+      llm: mock2,
+      config: harness.getConfig(),
+      policyEngine: new PolicyEngine([]),
+      hitl: new HitlStateMachine(),
+      sandbox: new Sandbox(dir, { timeout: 30, maxMemory: 512 }),
+      feedback: new FeedbackValidator({ test: "", lint: "", typecheck: "" }),
+      memory: new MemoryStore(join(dir, "memory.json")),
+      tracer: new Tracer(),
+      tools: {} as any,
+    })
+    const result = await harness2.run("second task")
+    expect(result.answer).toBe("Done2")
   })
 })

@@ -11,7 +11,7 @@ import type { Tool } from "./tools/file.js"
 import { shellExec } from "./tools/shell.js"
 
 export interface HarnessDeps {
-  llm: LLMProvider
+  llm: LLMProvider | undefined
   config: Config
   policyEngine: PolicyEngine
   hitl: HitlStateMachine
@@ -56,7 +56,8 @@ export class Harness {
       steps++
       tracer.record({ type: "step", data: { step: steps } })
 
-      const response = await llm.complete(context)
+      if (!llm) throw new Error("LLM provider not configured")
+      const response = await llm.complete(context, undefined, config.timeout * 1000)
       tracer.record({ type: "thinking", data: { text: response.text } })
 
       context.push({ role: "assistant", content: response.text, action: response.action })
@@ -79,7 +80,7 @@ export class Harness {
         tracer.record({ type: "governance", data: govResult })
 
         if (govResult.decision === "deny") {
-          context.push({ role: "user", content: `Action denied: ${govResult.policy?.message ?? "policy violation"}` })
+          context.push({ role: "user", content: `Tool result: Action denied - ${govResult.policy?.message ?? "policy violation"}` })
           continue
         }
 
@@ -92,7 +93,7 @@ export class Harness {
             tracer.record({ type: "tool_result", data: result })
             context.push({ role: "user", content: `Tool result: ${JSON.stringify(result)}` })
           } else {
-            context.push({ role: "user", content: `Action denied: ${govResult.policy?.message ?? ""}` })
+            context.push({ role: "user", content: `Tool result: Action denied - ${govResult.policy?.message ?? ""}` })
           }
           continue
         }

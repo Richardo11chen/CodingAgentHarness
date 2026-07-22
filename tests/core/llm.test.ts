@@ -19,8 +19,27 @@ describe("MockLLMProvider", () => {
   })
 
   it("returns done when responses exhausted", async () => {
-    const mock = new MockLLMProvider([])
-    const r = await mock.complete([])
-    expect(r.action.type).toBe("done")
+    const mock = new MockLLMProvider([{ text: "only", action: { type: "done" } }])
+    const r1 = await mock.complete([])
+    expect(r1.text).toBe("only")
+    const r2 = await mock.complete([])
+    expect(r2.action.type).toBe("done")
+    expect(r2.text).toBe("done")
+  })
+
+  it("returns responses in FIFO order", async () => {
+    const mock = new MockLLMProvider([
+      { text: "first", action: { type: "done" } },
+      { text: "second", action: { type: "done" } },
+    ])
+    expect((await mock.complete([])).text).toBe("first")
+    expect((await mock.complete([])).text).toBe("second")
+  })
+
+  it("does not mutate passed messages", async () => {
+    const mock = new MockLLMProvider([{ text: "ok", action: { type: "done" } }])
+    const msgs = [{ role: "user" as const, content: "test" }]
+    await mock.complete(msgs)
+    expect(msgs.length).toBe(1)
   })
 })

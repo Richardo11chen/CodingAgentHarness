@@ -46,4 +46,10 @@ describe("KeychainStore", () => {
     expect(await store.hasKey("api_key")).toBe(true)
     expect(await store.hasKey("other")).toBe(false)
   })
+
+  it("getPassword handles empty string as not found", async () => {
+    const store = new KeychainStore("test-service")
+    expect(await store.get("nonexistent")).toBeNull()
+    expect(await store.hasKey("nonexistent")).toBe(false)
+  })
 })

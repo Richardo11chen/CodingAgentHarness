@@ -20,9 +20,16 @@ export class HitlStateMachine {
     this.pendingAction = action
   }
 
-  waitForApproval(): Promise<Action | null> {
+  waitForApproval(timeoutMs = 300000): Promise<Action | null> {
     return new Promise((resolve) => {
       this.approvalResolver = resolve
+      if (timeoutMs > 0) {
+        setTimeout(() => {
+          if (this.state === AgentState.PendingApproval) {
+            this.timeout()
+          }
+        }, timeoutMs)
+      }
     })
   }
 

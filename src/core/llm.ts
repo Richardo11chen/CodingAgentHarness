@@ -1,7 +1,7 @@
 import type { Message, LLMResponse, LLMOptions } from "./types.js"
 
 export interface LLMProvider {
-  complete(messages: Message[], options?: LLMOptions): Promise<LLMResponse>
+  complete(messages: Message[], options?: LLMOptions, timeoutMs?: number): Promise<LLMResponse>
 }
 
 export class MockLLMProvider implements LLMProvider {
@@ -11,7 +11,7 @@ export class MockLLMProvider implements LLMProvider {
     this.responses = [...responses]
   }
 
-  async complete(_messages: Message[], _options?: LLMOptions): Promise<LLMResponse> {
+  async complete(_messages: Message[], _options?: LLMOptions, _timeoutMs?: number): Promise<LLMResponse> {
     if (this.responses.length === 0) {
       return { text: "done", action: { type: "done" } }
     }
@@ -71,7 +71,7 @@ export class RealLLMProvider implements LLMProvider {
     return result
   }
 
-  async complete(messages: Message[], options?: LLMOptions): Promise<LLMResponse> {
+  async complete(messages: Message[], options?: LLMOptions, timeoutMs = 300000): Promise<LLMResponse> {
     const tools = [
       {
         type: "function",
@@ -100,6 +100,14 @@ export class RealLLMProvider implements LLMProvider {
       {
         type: "function",
         function: {
+          name: "file_delete",
+          description: "Delete a file",
+          parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
+        },
+      },
+      {
+        type: "function",
+        function: {
           name: "run_test",
           description: "Run tests",
           parameters: { type: "object", properties: { command: { type: "string" } }, required: ["command"] },
@@ -115,39 +123,46 @@ export class RealLLMProvider implements LLMProvider {
       max_tokens: options?.maxTokens ?? 4096,
     }
 
-    const res = await fetch(`${this.config.baseURL}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${this.config.apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    })
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+    try {
+      const res = await fetch(`${this.config.baseURL}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${this.config.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      })
 
-    if (!res.ok) {
-      const errText = await res.text()
-      throw new Error(`LLM API error ${res.status}: ${errText}`)
-    }
+      if (!res.ok) {
+        const errText = await res.text()
+        throw new Error(`LLM API error ${res.status}: ${errText}`)
+      }
 
-    const data = await res.json()
-    const message = data.choices[0].message
-    const text = message.content || message.reasoning_content || ""
-    const toolCall = message.tool_calls?.[0]
+      const data = await res.json()
+      const message = data.choices[0].message
+      const text = message.content || message.reasoning_content || ""
+      const toolCall = message.tool_calls?.[0]
 
-    if (!toolCall) {
-      return { text, action: { type: "done", text } }
-    }
+      if (!toolCall) {
+        return { text, action: { type: "done", text } }
+      }
 
-    let args: any = {}
-    try { args = JSON.parse(toolCall.function.arguments) } catch {}
-    return {
-      text,
-      action: {
-        type: "call_tool",
-        tool: toolCall.function.name,
-        args,
-        changedCode: toolCall.function.name === "file_write",
-      },
+      let args: any = {}
+      try { args = JSON.parse(toolCall.function.arguments) } catch {}
+      return {
+        text,
+        action: {
+          type: "call_tool",
+          tool: toolCall.function.name,
+          args,
+          changedCode: toolCall.function.name === "file_write",
+        },
+      }
+    } finally {
+      clearTimeout(timeoutId)
     }
   }
 }

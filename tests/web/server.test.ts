@@ -70,4 +70,129 @@ describe("WebUI Server", () => {
     expect(typeof data.hasKey).toBe("boolean")
     expect(data.key).toBeUndefined()
   })
+
+  it("POST /api/sessions/:id/message starts agent run", async () => {
+    const cres = await fetch(`http://localhost:${port}/api/sessions`, { method: "POST" })
+    const { id } = await cres.json()
+
+    const res = await fetch(`http://localhost:${port}/api/sessions/${id}/message`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "say hi" }),
+    })
+    expect(res.ok).toBe(true)
+    const data = await res.json()
+    expect(data.status).toBe("started")
+  })
+
+  it("POST /api/sessions/:id/approve approves action", async () => {
+    const cres = await fetch(`http://localhost:${port}/api/sessions`, { method: "POST" })
+    const { id } = await cres.json()
+
+    const res = await fetch(`http://localhost:${port}/api/sessions/${id}/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ approved: true }),
+    })
+    expect(res.ok).toBe(true)
+    const data = await res.json()
+    expect(data.status).toBe("ok")
+  })
+
+  it("POST /api/sessions/:id/approve denies action", async () => {
+    const cres = await fetch(`http://localhost:${port}/api/sessions`, { method: "POST" })
+    const { id } = await cres.json()
+
+    const res = await fetch(`http://localhost:${port}/api/sessions/${id}/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ approved: false }),
+    })
+    expect(res.ok).toBe(true)
+  })
+
+  it("DELETE /api/sessions/:id cleans up session", async () => {
+    const cres = await fetch(`http://localhost:${port}/api/sessions`, { method: "POST" })
+    const { id } = await cres.json()
+
+    const res = await fetch(`http://localhost:${port}/api/sessions/${id}`, { method: "DELETE" })
+    expect(res.ok).toBe(true)
+    const data = await res.json()
+    expect(data.status).toBe("deleted")
+
+    const check = await fetch(`http://localhost:${port}/api/sessions/${id}/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ approved: true }),
+    })
+    expect(check.status).toBe(404)
+  })
+
+  it("GET /api/auth-token returns token", async () => {
+    const res = await fetch(`http://localhost:${port}/api/auth-token`)
+    expect(res.ok).toBe(true)
+    const data = await res.json()
+    expect(data.token).toBeTruthy()
+    expect(typeof data.token).toBe("string")
+    expect(data.token.length).toBeGreaterThan(0)
+  })
+
+  it("returns 404 for unknown session message", async () => {
+    const res = await fetch(`http://localhost:${port}/api/sessions/unknown/message`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "test" }),
+    })
+    expect(res.status).toBe(404)
+  })
+
+  it("PUT /api/config deep merges llm config", async () => {
+    const prevCfg = await fetch(`http://localhost:${port}/api/config`).then(r => r.json())
+
+    const res = await fetch(`http://localhost:${port}/api/config`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ llm: { model: "new-model" } }),
+    })
+    expect(res.ok).toBe(true)
+
+    const newCfg = await fetch(`http://localhost:${port}/api/config`).then(r => r.json())
+    expect(newCfg.llm.model).toBe("new-model")
+    expect(newCfg.llm.provider).toBe(prevCfg.llm.provider)
+  })
+
+  it("POST /api/credentials saves key and rebuilds LLM", async () => {
+    const res = await fetch(`http://localhost:${port}/api/credentials`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: "sk-test-key" }),
+    })
+    expect(res.ok).toBe(true)
+
+    const check = await fetch(`http://localhost:${port}/api/credentials`).then(r => r.json())
+    expect(check.hasKey).toBe(true)
+  })
+
+  it("rejects empty message", async () => {
+    const cres = await fetch(`http://localhost:${port}/api/sessions`, { method: "POST" })
+    const { id } = await cres.json()
+
+    const res = await fetch(`http://localhost:${port}/api/sessions/${id}/message`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "   " }),
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it("creates multiple sessions independently", async () => {
+    const ids = new Set<string>()
+    for (let i = 0; i < 5; i++) {
+      const res = await fetch(`http://localhost:${port}/api/sessions`, { method: "POST" })
+      const { id } = await res.json()
+      ids.add(id)
+      expect(id).toBeTruthy()
+    }
+    expect(ids.size).toBe(5)
+  })
 })

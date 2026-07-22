@@ -22,10 +22,14 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
 
   const saveKey = async () => {
     if (apiKey) {
-      await fetch("/api/credentials", {
+      const res = await fetch("/api/credentials", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key: apiKey }),
       })
+      if (!res.ok) {
+        alert("保存 Key 失败")
+        return
+      }
       setHasKey(true)
       setApiKey("")
       setSaved(true)
@@ -34,15 +38,23 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
   }
 
   const deleteKey = async () => {
-    await fetch("/api/credentials", { method: "DELETE" })
+    const res = await fetch("/api/credentials", { method: "DELETE" })
+    if (!res.ok) {
+      alert("删除 Key 失败")
+      return
+    }
     setHasKey(false)
   }
 
   const saveConfig = async () => {
-    await fetch("/api/config", {
+    const res = await fetch("/api/config", {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ llm: { model, baseURL } }),
     })
+    if (!res.ok) {
+      alert("保存配置失败")
+      return
+    }
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }

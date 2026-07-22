@@ -1,7 +1,7 @@
 rules:
   - name: "no-rm-rf-root"
     type: command_pattern
-    pattern: 'rm\s+(-[a-zA-Z]*f[a-zA-Z]*\s+)*-?r?f?\s+/'
+    pattern: 'rm\s+.*(-[a-zA-Z]*[rR][a-zA-Z]*[fF]|-[a-zA-Z]*[fF][a-zA-Z]*[rR]).*\s+/'
     decision: deny
     message: "禁止递归删除根目录"
 

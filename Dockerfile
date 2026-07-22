@@ -14,8 +14,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends libsecret-1-0 &
 COPY --from=builder /app/dist /app/dist
 COPY --from=builder /app/node_modules /app/node_modules
 COPY --from=builder /app/package.json /app/package.json
-COPY --from=builder /app/.harness /app/.harness
 RUN mkdir -p /workspace
+COPY --from=builder /app/.harness /workspace/.harness
 WORKDIR /workspace
 ENV NODE_ENV=production
 EXPOSE 3000

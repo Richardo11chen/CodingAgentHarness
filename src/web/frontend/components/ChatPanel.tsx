@@ -6,9 +6,10 @@ interface ChatPanelProps {
   onSend: (message: string) => void
   messages: { role: string; content: string }[]
   onClear?: () => void
+  running?: boolean
 }
 
-export function ChatPanel({ onSend, messages, onClear }: ChatPanelProps) {
+export function ChatPanel({ onSend, messages, onClear, running }: ChatPanelProps) {
   const [input, setInput] = useState("")
 
   const handleSend = () => {
@@ -89,24 +90,32 @@ export function ChatPanel({ onSend, messages, onClear }: ChatPanelProps) {
         padding: "12px 16px", borderTop: `1px solid ${theme.border.subtle}`,
         display: "flex", gap: "8px",
       }}>
-        <input
+        <textarea
           style={{
             flex: 1, padding: "8px 14px", borderRadius: theme.radius.standard,
             border: `1px solid ${theme.border.standard}`, background: theme.bg.translucent,
             color: theme.text.primary, fontSize: "14px", outline: "none",
             fontFamily: theme.font.family, fontFeatureSettings: theme.font.features,
+            resize: "none", minHeight: "38px", maxHeight: "120px",
           }}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          placeholder="输入消息..."
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault()
+              handleSend()
+            }
+          }}
+          placeholder="输入消息... (Shift+Enter 换行)"
+          rows={1}
         />
-        <button onClick={handleSend} style={{
+        <button onClick={handleSend} disabled={running} style={{
           padding: "8px 20px", borderRadius: theme.radius.standard,
-          background: theme.brand.indigo, color: "#fff", border: "none",
-          fontSize: "14px", fontWeight: 510, cursor: "pointer",
+          background: running ? theme.bg.translucentActive : theme.brand.indigo,
+          color: running ? theme.text.tertiary : "#fff", border: "none",
+          fontSize: "14px", fontWeight: 510, cursor: running ? "not-allowed" : "pointer",
           fontFamily: theme.font.family,
-        }}>发送</button>
+        }}>{running ? "运行中..." : "发送"}</button>
       </div>
     </div>
   )

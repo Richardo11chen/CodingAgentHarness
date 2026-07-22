@@ -17,14 +17,18 @@ export class Sandbox {
   }
 
   async run(tool: Tool, args: ToolArgs): Promise<ToolResult> {
-    if (args.path && !this.isPathAllowed(args.path)) {
-      return { success: false, error: `path outside project directory: ${args.path}` }
+    const resolvedArgs = { ...args }
+    if (args.path) {
+      const resolved = resolve(this.projectDir, args.path)
+      if (!this.isPathAllowed(resolved)) {
+        return { success: false, error: `path outside project directory: ${args.path}` }
+      }
+      resolvedArgs.path = resolved
     }
-    return tool(args)
+    return tool(resolvedArgs)
   }
 
-  private isPathAllowed(path: string): boolean {
-    const resolved = resolve(this.projectDir, path)
+  private isPathAllowed(resolved: string): boolean {
     const rel = relative(this.projectDir, resolved)
     return !rel.startsWith("..") && !isAbsolute(rel)
   }

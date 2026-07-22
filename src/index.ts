@@ -20,7 +20,7 @@ async function getApiKey(): Promise<string | null> {
   const envPath = join(process.cwd(), ".harness", ".env")
   if (existsSync(envPath)) {
     const envStore = new EnvStore(envPath)
-    if (await envStore.hasKey("API_KEY")) return await envStore.get("API_KEY")
+    if (await envStore.hasKey("api_key")) return await envStore.get("api_key")
   }
 
   return null

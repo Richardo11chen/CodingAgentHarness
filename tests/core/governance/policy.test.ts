@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { PolicyEngine } from "../../../src/core/governance/policy"
 import type { Policy, Action } from "../../../src/core/types"
+import { join } from "node:path"
 
 const policies: Policy[] = [
   { name: "no-rm-rf", type: "command_pattern", pattern: "rm\\s+.*-r?f?.*/", decision: "deny", message: "no rm -rf" },
@@ -44,5 +45,70 @@ describe("PolicyEngine", () => {
     const action: Action = { type: "call_tool", tool: "file_read", args: { path: "src/a.ts" } }
     const result = emptyEngine.evaluate(action)
     expect(result.decision).toBe("allow")
+  })
+})
+
+describe("PolicyEngine boundary tests", () => {
+  it("loads policies from yaml file", () => {
+    const engine = PolicyEngine.fromYaml(join(process.cwd(), ".harness", "policies.yml"))
+    expect(engine).toBeDefined()
+  })
+
+  describe("with actual policies.yml regex", () => {
+    const engine = PolicyEngine.fromYaml(join(process.cwd(), ".harness", "policies.yml"))
+
+    const cases = [
+      { cmd: "rm -rf /", shouldDeny: true, desc: "rm -rf 根目录" },
+      { cmd: "rm -rf /tmp", shouldDeny: true, desc: "rm -rf 子目录" },
+      { cmd: "rm -fr /", shouldDeny: true, desc: "rm -fr 变体" },
+      { cmd: "rm -Rf /", shouldDeny: true, desc: "rm -Rf 大写" },
+      { cmd: "rm -rf --no-preserve-root /", shouldDeny: true, desc: "带 --no-preserve-root" },
+      { cmd: "rm -r -f /", shouldDeny: false, desc: "分离标志（已知边界）" },
+      { cmd: "rm /tmp/file", shouldDeny: false, desc: "不带递归" },
+      { cmd: "echo hello", shouldDeny: false, desc: "安全命令" },
+    ]
+
+    for (const c of cases) {
+      it(`${c.desc}: ${c.cmd}`, () => {
+        const action: Action = { type: "call_tool", tool: "shell_exec", args: { command: c.cmd } }
+        const result = engine.evaluate(action)
+        if (c.shouldDeny) {
+          expect(result.decision).toBe("deny")
+        }
+      })
+    }
+
+    it("asks approval for git push --force", () => {
+      const action: Action = { type: "call_tool", tool: "shell_exec", args: { command: "git push --force origin main" } }
+      const result = engine.evaluate(action)
+      expect(result.decision).toBe("ask")
+    })
+  })
+
+  it("path_boundary blocks path outside project", () => {
+    const policies: Policy[] = [
+      { name: "project-only", type: "path_boundary", pattern: "/tmp/safe", decision: "deny", message: "outside" },
+    ]
+    const engine = new PolicyEngine(policies)
+    const action: Action = { type: "call_tool", tool: "file_write", args: { path: "/etc/passwd", content: "x" } }
+    const result = engine.evaluate(action)
+    expect(result.decision).toBe("deny")
+  })
+
+  it("does not match when args are missing", () => {
+    const action: Action = { type: "call_tool", tool: "file_write" }
+    const engine = new PolicyEngine(policies)
+    const result = engine.evaluate(action)
+    expect(result.decision).toBe("allow")
+  })
+
+  it("path_pattern matches via glob", () => {
+    const policies: Policy[] = [
+      { name: "env-protect", type: "path_pattern", pattern: "**/.env", decision: "ask", message: "env" },
+    ]
+    const engine = new PolicyEngine(policies)
+    const action: Action = { type: "call_tool", tool: "file_write", args: { path: "src/.env", content: "x" } }
+    const result = engine.evaluate(action)
+    expect(result.decision).toBe("ask")
   })
 })
