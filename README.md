@@ -1,6 +1,9 @@
 # Coding Agent Harness
 
 > Agent = LLM + Harness. 本项目实现了一个面向 coding 场景的 agent harness 内核——当 LLM 负责"决定下一步做什么"时，harness 负责组织上下文、分发工具、治理护栏、反馈闭环、记忆与配置。
+>
+> **平台**: https://github.com/Richardo11chen/CodingAgentHarness |
+> **Release**: https://github.com/Richardo11chen/CodingAgentHarness/releases
 
 ## 项目简介
 
@@ -213,12 +216,13 @@ npx vitest run tests/demo/
 
 ## 分发
 
+**托管平台**: https://github.com/Richardo11chen/CodingAgentHarness/releases
+
 | 形态 | 命令 |
 |------|------|
 | npm 安装 | `npm install -g coding-agent-harness` |
-| Docker | `docker build -t coding-agent-harness .` |
-| Docker 运行 | `docker run -p 3000:3000 -e OPENAI_API_KEY=xxx coding-agent-harness` |
 | 源码 | `npm ci && npm run dev` |
+| Docker | `docker build -t coding-agent-harness .` |
 | Render | 使用 `render.yaml`，设置 `OPENAI_API_KEY` 环境变量 |
 
 ## 他人使用须知
